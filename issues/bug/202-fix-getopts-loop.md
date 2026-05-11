@@ -2,7 +2,8 @@
 id: FEAT-202
 type: bug
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.9.0
 ---
 
 # Fix broken `getopts` loop in `bin/secret`

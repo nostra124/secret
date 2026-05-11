@@ -2,7 +2,8 @@
 id: FEAT-201
 type: bug
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.9.0
 ---
 
 # Fix typos in user-visible strings throughout `bin/secret`

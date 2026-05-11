@@ -2,7 +2,8 @@
 id: FEAT-200
 type: bug
 priority: high
-status: open
+status: resolved
+resolved-in: 0.9.0
 ---
 
 # Fix broken `command:accounts` and `add-account` references in `gpg-keys` and `sync`

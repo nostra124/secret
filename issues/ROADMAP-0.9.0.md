@@ -2,6 +2,7 @@
 version: 0.9.0
 milestone: correctness
 from: 0.8.0
+status: released
 semver-justification: >
   Minor bump. FEAT-201 changes user-visible error message strings
   (output contract); FEAT-202 changes flag-parsing behaviour. Neither
@@ -39,10 +40,13 @@ semver-justification: >
 
 ## Release checklist
 
-- [ ] `bats tests/unit/secret.bats` — all 40 existing tests green
-- [ ] New tests from FEAT-200 and FEAT-202 pass
-- [ ] `shellcheck -S warning bin/secret` reports no new warnings
-- [ ] `secret gpg-keys` with no args exits 0 without "command not found"
+- [x] `bats tests/unit/secret.bats` — 46 tests green (40 existing + 6 new)
+- [x] New tests from FEAT-200 and FEAT-202 pass
+- [x] `secret gpg-keys` with no args exits 0 without "command not found"
+- [x] `secret -q stores` and `secret -d version` behave correctly
+- [x] `VERSION` (new project-root canonical) and `.rpk/version` both
+      bumped to `0.9.0`; `.rpk/versions` ledger appended
+- [ ] `shellcheck -S warning bin/secret` reports no new warnings (deferred
+      to 0.10.0 — see FEAT-203)
 - [ ] `secret sync unreachable-account` exits 0 with a warn message
-- [ ] `secret -q stores` and `secret -d version` behave correctly
-- [ ] `.rpk/version` bumped to `0.9.0` and entry added to `.rpk/versions`
+      (needs `account` available; covered by SIT, not unit tests)
