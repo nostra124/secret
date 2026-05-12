@@ -23,14 +23,18 @@ MANDIR    = @MANDIR@
 BUILD_DIR = build/$(PACKAGE)
 
 .PHONY: all install uninstall check check-unit check-vectors \
-        check-sit check-all lint test help package clean \
-        install-skills-user uninstall-skills-user
+        check-sit check-pit check-all lint test help package version clean \
+        install-skills-user uninstall-skills-user \
+        install-hooks uninstall-hooks
 
 all: install
 
 help:
-	@echo "Targets: install, uninstall, check, lint, check-sit, check-all,"
-	@echo "         install-skills-user, uninstall-skills-user, package, clean"
+	@echo "Targets: install, uninstall, check, lint,"
+	@echo "         check-sit, check-pit, check-all,"
+	@echo "         install-hooks, uninstall-hooks,"
+	@echo "         install-skills-user, uninstall-skills-user,"
+	@echo "         package VERSION=x.y.z, version, clean"
 
 # Stow-based install builds a tree mirroring $PREFIX layout under
 # $(BUILD_DIR), then `stow -t $(PREFIX)` symlinks it. Symmetric
@@ -57,11 +61,13 @@ install:
 		cp -a share/doc/$(PACKAGE)/* \
 		      $(BUILD_DIR)$(DATADIR)/doc/$(PACKAGE)/; \
 	fi
-	# .rpk/version → $DATADIR/<pkg>/version : the runtime version
-	# string the binary reads (FEAT-194). The binary's two-path
-	# fallback resolves to this file when invoked as the installed
-	# entry, and to .rpk/version when invoked from a dev tree.
-	@if [ -f .rpk/version ]; then \
+	# VERSION (project-root canonical, FEAT-200-era) →
+	# $DATADIR/<pkg>/version : the runtime version string the
+	# binary reads. Falls back to .rpk/version (FEAT-194 legacy) if
+	# VERSION is absent — e.g. on freshly cloned older trees.
+	@if [ -f VERSION ]; then \
+		install -m 644 VERSION $(BUILD_DIR)$(DATADIR)/$(PACKAGE)/version; \
+	elif [ -f .rpk/version ]; then \
 		install -m 644 .rpk/version $(BUILD_DIR)$(DATADIR)/$(PACKAGE)/version; \
 	fi
 	@stow -d build -t $(PREFIX) $(PACKAGE)
@@ -84,11 +90,24 @@ check-vectors:
 	else echo "prove or tests/vectors/ not present; skipping"; fi
 
 check-sit:
-	@if command -v podman >/dev/null 2>&1; then \
-		echo "==> SIT: see tests/sit/README.md"; \
-	else echo "podman not installed; soft-skipping SIT"; fi
+	@if ! command -v podman >/dev/null 2>&1; then \
+		echo "podman not installed; soft-skipping SIT"; \
+	elif [ -x tests/sit/run.sh ]; then \
+		tests/sit/run.sh; \
+	else \
+		echo "tests/sit/run.sh not present; skipping"; \
+	fi
 
-check-all: check check-sit
+check-pit:
+	@if ! command -v podman >/dev/null 2>&1; then \
+		echo "podman not installed; soft-skipping PIT"; \
+	elif [ -x tests/pit/run.sh ]; then \
+		tests/pit/run.sh; \
+	else \
+		echo "tests/pit/run.sh not present; skipping"; \
+	fi
+
+check-all: check check-sit check-pit
 
 lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
@@ -119,7 +138,9 @@ uninstall-skills-user:
 		  -maxdepth 1 -name $$name -type l -delete 2>/dev/null || true; \
 	done
 
-# Versioning (FEAT-194)
+# Versioning (FEAT-194). VERSION at the project root is canonical;
+# .rpk/version is kept as a mirror for FEAT-194 backwards compat. See
+# skills/version.md for the release flow.
 package:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make package VERSION=x.y.z"; exit 1; \
@@ -128,10 +149,45 @@ package:
 		echo "Invalid semver: $(VERSION)"; exit 1; }
 	@printf '%s\t%s\n' "$(VERSION)" "$$(git rev-parse HEAD)" \
 		>> .rpk/versions
+	@echo "$(VERSION)" > VERSION
 	@echo "$(VERSION)" > .rpk/version
-	@git add .rpk/version .rpk/versions
+	@git add VERSION .rpk/version .rpk/versions
 	@git commit -m "package $(VERSION)"
 	@git tag "v$(VERSION)"
+
+# Print the currently-checked-out version. Resolution mirrors the
+# fallback order in bin/secret (VERSION → .rpk/version → hardcoded).
+version:
+	@if [ -f VERSION ]; then \
+		cat VERSION; \
+	elif [ -f .rpk/version ]; then \
+		cat .rpk/version; \
+	else \
+		echo "unknown"; \
+	fi
+
+# Git hooks. Symlink etc/hooks/* into .git/hooks/ so the versioned
+# hook scripts run on push / commit. See skills/testing.md.
+install-hooks:
+	@if [ ! -d .git ]; then \
+		echo "install-hooks: not a git repo (no .git/)"; exit 1; \
+	fi
+	@mkdir -p .git/hooks
+	@for hook in etc/hooks/*; do \
+		[ -f "$$hook" ] || continue; \
+		name=$$(basename "$$hook"); \
+		target=$$(pwd)/$$hook; \
+		ln -sf "$$target" ".git/hooks/$$name"; \
+		echo "linked .git/hooks/$$name -> $$target"; \
+	done
+
+uninstall-hooks:
+	@for hook in etc/hooks/*; do \
+		[ -f "$$hook" ] || continue; \
+		name=$$(basename "$$hook"); \
+		[ -L ".git/hooks/$$name" ] && rm ".git/hooks/$$name" \
+			&& echo "removed .git/hooks/$$name" || true; \
+	done
 
 # Per FEAT-191's invariant: clean never touches installed files.
 clean:

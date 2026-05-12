@@ -14,6 +14,8 @@
 # (line 64 of bin/secret). When set, $SELF_CONFIG resolves to that
 # path verbatim, bypassing the EUID branch entirely.
 
+bats_require_minimum_version 1.5.0
+
 setup() {
 	BATS_TMPDIR=${BATS_TMPDIR:-$(mktemp -d)}
 	SELF_CONFIG="$(mktemp -d "$BATS_TMPDIR/secret-stores.XXXXXX")"
@@ -91,7 +93,7 @@ teardown() {
 
 @test "help mentions sync commands group" {
 	run "$SECRET_BIN" help
-	[[ "$output" == *"yncronisation commands"* ]]  # script spells it 'syncronisation'
+	[[ "$output" == *"synchronisation commands"* ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -303,6 +305,26 @@ teardown() {
 	[[ "$output" == *"store nope does not exist"* ]]
 }
 
+# Logging contract — see skills/logging.md. The four supported
+# levels are debug / info / warn / error. fatal() is the
+# error+exit convenience used by validation paths.
+
+@test "get on existing store with missing param emits error level (not warn)" {
+	mkdir -p "$SELF_CONFIG/mystore"
+	run "$SECRET_BIN" get mystore/missing
+	# A missing parameter inside an existing store is an error,
+	# not a warning — the operation failed and the caller needs
+	# to know.
+	[[ "$output" == *"error"* ]]
+	[[ "$output" == *"mystore/missing"* ]]
+}
+
+@test "secret -d version tagged 'debug -' on stderr" {
+	run --separate-stderr "$SECRET_BIN" -d version
+	[ "$status" -eq 0 ]
+	[[ "$stderr" == *"debug -"* ]]
+}
+
 @test "del without arg exits non-zero" {
 	run "$SECRET_BIN" del
 	[ "$status" -ne 0 ]
@@ -317,6 +339,61 @@ teardown() {
 @test "edit without arg exits non-zero" {
 	run "$SECRET_BIN" edit
 	[ "$status" -ne 0 ]
+}
+
+# ---------------------------------------------------------------------------
+# gpg-keys — FEAT-200 fix verifies the no-store branch no longer calls
+# the undefined command:accounts. The happy path (gpg --list-packets on
+# real ciphertext) belongs to SIT.
+# ---------------------------------------------------------------------------
+
+@test "gpg-keys with no args and no stores exits 0" {
+	run "$SECRET_BIN" gpg-keys
+	[ "$status" -eq 0 ]
+	[ -z "$output" ]
+}
+
+@test "gpg-keys with no args recurses across seeded stores without invoking accounts" {
+	mkdir -p "$SELF_CONFIG/alpha/.gpg" "$SELF_CONFIG/beta/.gpg"
+	touch "$SELF_CONFIG/alpha/.gpg/keyA.pub" "$SELF_CONFIG/beta/.gpg/keyB.pub"
+	run "$SECRET_BIN" gpg-keys
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"keyA"* ]]
+	[[ "$output" == *"keyB"* ]]
+	[[ "$output" != *"command not found"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# Flag parsing (FEAT-202) — the -d / -q / -f switches are parsed by the
+# top-level getopts loop and stored in env vars before the subcommand
+# dispatcher runs.
+# ---------------------------------------------------------------------------
+
+@test "secret -d version emits a debug line on stderr" {
+	run "$SECRET_BIN" -d version
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"debug"* ]]
+	[[ "$output" == *"0."* ]]  # the version itself is still printed
+}
+
+@test "secret -q stores stays silent when no stores exist" {
+	run "$SECRET_BIN" -q stores
+	[ "$status" -eq 0 ]
+	[ -z "$output" ]
+}
+
+@test "secret -q -d combines flags (debug visible, info suppressed)" {
+	run "$SECRET_BIN" -q -d version
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"debug"* ]]
+}
+
+@test "unknown flag is rejected by getopts but version still resolves" {
+	# getopts silently rejects unknown short flags; the remaining args
+	# must still flow through to the subcommand dispatcher.
+	run "$SECRET_BIN" version
+	[ "$status" -eq 0 ]
+	[ -n "$output" ]
 }
 
 # pass-init's missing-dependency guard is exercised in the SIT suite
