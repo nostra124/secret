@@ -412,6 +412,56 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
+# FEAT-207 — path-traversal policy. `..` segments in store or parameter
+# names are rejected at the parser level so resolved file paths cannot
+# escape $SELF_CONFIG. Centralised in the validate_name helper.
+# ---------------------------------------------------------------------------
+
+@test "exists rejects '..' in store name" {
+	run "$SECRET_BIN" exists ../foo
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "params rejects '..' in store name" {
+	run "$SECRET_BIN" params ../foo
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "has rejects '..' anywhere in <store>/<param>" {
+	run "$SECRET_BIN" has store/../escape
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "get rejects '..' as store component" {
+	run "$SECRET_BIN" get ../etc/passwd
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "set rejects '..' as parameter component" {
+	run bash -c "echo x | $SECRET_BIN set store/../escape"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "destroy rejects '..' in store name" {
+	run "$SECRET_BIN" destroy ../foo
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+# Sanity check: a legitimate name containing two single dots (not
+# adjacent) is allowed.
+@test "exists allows store names with non-traversal dots" {
+	mkdir -p "$SELF_CONFIG/foo.bar.baz"
+	run "$SECRET_BIN" exists foo.bar.baz
+	[ "$status" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
 # FEAT-204 — argument-validation coverage for subcommands whose happy
 # paths require gpg / pass / qrencode / $EDITOR / network. We only
 # exercise the early-exit paths here; full behaviour belongs in SIT.

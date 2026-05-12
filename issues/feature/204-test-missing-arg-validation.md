@@ -2,7 +2,8 @@
 id: FEAT-204
 type: feature
 priority: high
-status: in-progress
+status: resolved
+resolved-in: 0.10.0
 ---
 
 # Add missing arg-validation unit tests for `gen`, `def`, `ins`, `rem`, `clean`, and GPG-key subcommands
