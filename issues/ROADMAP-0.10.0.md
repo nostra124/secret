@@ -2,11 +2,14 @@
 version: 0.10.0
 milestone: test-coverage
 from: 0.9.0
+status: in-progress
 semver-justification: >
-  Minor bump. FEAT-204 adds 17 new bats tests (expands the contract).
+  Minor bump. FEAT-204 adds new bats tests (expands the contract).
   FEAT-203 fixes unquoted expansions — no user-visible behaviour change
   on typical paths, but stores with spaces in names now work.
-  FEAT-207 may require a policy decision before coding begins.
+  FEAT-207 implements Option A (reject `..` path traversal); the new
+  fatal exit on traversal inputs is a security-tightening minor bump,
+  not a major. Existing bats assertions remain valid.
 ---
 
 # Release 0.10.0 — test coverage

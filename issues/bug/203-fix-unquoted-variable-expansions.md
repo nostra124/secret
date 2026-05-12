@@ -2,7 +2,7 @@
 id: FEAT-203
 type: bug
 priority: medium
-status: open
+status: in-progress
 ---
 
 # Quote variable expansions throughout `bin/secret` to support paths with spaces
