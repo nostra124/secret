@@ -69,6 +69,13 @@ encrypted-at-rest storage of structured secrets.
 FEAT-191). Stow-based install. `master` is always
 installable; releases are tagged via `.rpk/version`.
 
+After cloning, install the versioned git hooks with
+`make install-hooks` so the pre-push test gate runs
+locally. See `skills/testing.md` for the full
+unit/SIT/PIT layering, the CI workflow that posts
+failure logs back to the PR as comments, and the
+environment-detection logic in `etc/hooks/pre-push`.
+
 ## 8. Versioning
 
 Semver. The canonical version lives in `VERSION` at

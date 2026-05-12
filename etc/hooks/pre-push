@@ -1,0 +1,76 @@
+#!/bin/sh
+# Pre-push hook — runs the appropriate test surface for the current
+# environment before allowing a push to proceed.
+#
+# Decision table (see skills/testing.md):
+#   * tests/unit/*.bats         always run if `bats` is on $PATH
+#   * tests/sit/**              run if `podman` is on $PATH AND the
+#                               directory exists
+#   * tests/pit/**              run if `podman` is on $PATH AND the
+#                               directory exists
+#
+# Override with `SECRET_SKIP_TESTS=1 git push` for the (rare) case of
+# pushing a docs-only change before a hot-fix CI run can complete.
+#
+# Install with: make install-hooks  (symlinks this file to
+# .git/hooks/pre-push)
+
+set -e
+
+if [ -n "$SECRET_SKIP_TESTS" ]; then
+	echo "pre-push: SECRET_SKIP_TESTS set — skipping all tests" >&2
+	exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+run_unit() {
+	if ! command -v bats >/dev/null 2>&1; then
+		echo "pre-push: bats not installed — unit suite cannot run" >&2
+		echo "  install with: apt-get install bats   (or your distro's equivalent)" >&2
+		return 1
+	fi
+	echo "pre-push: running unit suite (tests/unit/*.bats)" >&2
+	bats tests/unit/*.bats
+}
+
+run_sit() {
+	if [ ! -d tests/sit ]; then
+		return 0  # no SIT suite present; nothing to do
+	fi
+	echo "pre-push: running SIT suite (tests/sit/)" >&2
+	# SIT runner contract: tests/sit/run.sh exits non-zero on failure.
+	if [ -x tests/sit/run.sh ]; then
+		tests/sit/run.sh
+	else
+		echo "pre-push: tests/sit/ present but no run.sh — see skills/testing.md" >&2
+		return 1
+	fi
+}
+
+run_pit() {
+	if [ ! -d tests/pit ]; then
+		return 0  # no PIT suite present; nothing to do
+	fi
+	echo "pre-push: running PIT suite (tests/pit/)" >&2
+	if [ -x tests/pit/run.sh ]; then
+		tests/pit/run.sh
+	else
+		echo "pre-push: tests/pit/ present but no run.sh — see skills/testing.md" >&2
+		return 1
+	fi
+}
+
+# Always run unit tests. In a cloud sandbox (no podman) this is the
+# only suite. On a desktop with podman, SIT and PIT layer on top.
+run_unit
+
+if command -v podman >/dev/null 2>&1; then
+	echo "pre-push: podman detected — running container-backed suites" >&2
+	run_sit
+	run_pit
+else
+	echo "pre-push: podman not detected — skipping SIT and PIT" >&2
+	echo "  (CI will run the unit suite again; SIT/PIT run on desktop only)" >&2
+fi

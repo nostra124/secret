@@ -23,13 +23,16 @@ MANDIR    = @MANDIR@
 BUILD_DIR = build/$(PACKAGE)
 
 .PHONY: all install uninstall check check-unit check-vectors \
-        check-sit check-all lint test help package version clean \
-        install-skills-user uninstall-skills-user
+        check-sit check-pit check-all lint test help package version clean \
+        install-skills-user uninstall-skills-user \
+        install-hooks uninstall-hooks
 
 all: install
 
 help:
-	@echo "Targets: install, uninstall, check, lint, check-sit, check-all,"
+	@echo "Targets: install, uninstall, check, lint,"
+	@echo "         check-sit, check-pit, check-all,"
+	@echo "         install-hooks, uninstall-hooks,"
 	@echo "         install-skills-user, uninstall-skills-user,"
 	@echo "         package VERSION=x.y.z, version, clean"
 
@@ -87,11 +90,24 @@ check-vectors:
 	else echo "prove or tests/vectors/ not present; skipping"; fi
 
 check-sit:
-	@if command -v podman >/dev/null 2>&1; then \
-		echo "==> SIT: see tests/sit/README.md"; \
-	else echo "podman not installed; soft-skipping SIT"; fi
+	@if ! command -v podman >/dev/null 2>&1; then \
+		echo "podman not installed; soft-skipping SIT"; \
+	elif [ -x tests/sit/run.sh ]; then \
+		tests/sit/run.sh; \
+	else \
+		echo "tests/sit/run.sh not present; skipping"; \
+	fi
 
-check-all: check check-sit
+check-pit:
+	@if ! command -v podman >/dev/null 2>&1; then \
+		echo "podman not installed; soft-skipping PIT"; \
+	elif [ -x tests/pit/run.sh ]; then \
+		tests/pit/run.sh; \
+	else \
+		echo "tests/pit/run.sh not present; skipping"; \
+	fi
+
+check-all: check check-sit check-pit
 
 lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
@@ -149,6 +165,29 @@ version:
 	else \
 		echo "unknown"; \
 	fi
+
+# Git hooks. Symlink etc/hooks/* into .git/hooks/ so the versioned
+# hook scripts run on push / commit. See skills/testing.md.
+install-hooks:
+	@if [ ! -d .git ]; then \
+		echo "install-hooks: not a git repo (no .git/)"; exit 1; \
+	fi
+	@mkdir -p .git/hooks
+	@for hook in etc/hooks/*; do \
+		[ -f "$$hook" ] || continue; \
+		name=$$(basename "$$hook"); \
+		target=$$(pwd)/$$hook; \
+		ln -sf "$$target" ".git/hooks/$$name"; \
+		echo "linked .git/hooks/$$name -> $$target"; \
+	done
+
+uninstall-hooks:
+	@for hook in etc/hooks/*; do \
+		[ -f "$$hook" ] || continue; \
+		name=$$(basename "$$hook"); \
+		[ -L ".git/hooks/$$name" ] && rm ".git/hooks/$$name" \
+			&& echo "removed .git/hooks/$$name" || true; \
+	done
 
 # Per FEAT-191's invariant: clean never touches installed files.
 clean:

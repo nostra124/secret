@@ -1,0 +1,72 @@
+# Run the bats unit suite on every PR and push to master. On failure,
+# post the trimmed log as a PR comment so reviewers (and Claude) can
+# read it without leaving the PR.
+#
+# SIT and PIT are intentionally NOT run here — they require podman /
+# real GPG and live under the pre-push hook (etc/hooks/pre-push) for
+# desktop runs. See skills/testing.md for the full layering.
+
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Run unit tests
+        id: bats
+        run: |
+          set -o pipefail
+          bats tests/unit/*.bats 2>&1 | tee test-output.log
+
+      - name: Capture failure log
+        if: failure() && steps.bats.outcome == 'failure'
+        run: |
+          # Keep the comment under GitHub's 65 535-char limit. Take
+          # the last 200 lines — failures live at the tail of bats
+          # output.
+          tail -n 200 test-output.log > failure-tail.log
+          echo "FAILED_LINES=$(wc -l < failure-tail.log)" >> "$GITHUB_ENV"
+
+      - name: Post failure to PR
+        if: failure() && steps.bats.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## CI: bats unit tests failed"
+            echo
+            echo "_Workflow: \`${{ github.workflow }}\` · run [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) · commit \`${{ github.sha }}\`_"
+            echo
+            echo "<details><summary>Last $FAILED_LINES lines of \`bats tests/unit/*.bats\`</summary>"
+            echo
+            echo '```'
+            cat failure-tail.log
+            echo '```'
+            echo
+            echo "</details>"
+          } > comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file comment.md
+
+      - name: Upload full log as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bats-unit-log
+          path: test-output.log
+          retention-days: 7
