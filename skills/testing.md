@@ -149,6 +149,21 @@ The PR-comment behaviour is intentional and load-bearing:
 - It triggers a `pull_request_comment` webhook, which wakes any
   Claude session subscribed to the PR via `subscribe_pr_activity`.
 
+CI also emits **`check_run` events** when a job finishes —
+delivered through the same webhook subscription. The agent reacts
+differently to each conclusion (see `skills/automerging.md` §2b):
+
+| `check_run.conclusion` | Agent action |
+|---|---|
+| `success` | Re-check merge prerequisites; auto-merge or manual-merge per `skills/automerging.md` |
+| `failure` | Open a bug via `skills/bugs.md`; do **not** merge |
+| `cancelled` / `timed_out` / `action_required` | Treat as failure; investigate first, re-trigger only if confirmed flake |
+
+The agent **must subscribe** via `subscribe_pr_activity` and react
+to events. Polling `get_check_runs` in a loop, sleeping until CI
+finishes, or any other busy-wait pattern is forbidden — it hangs
+the session and produces no work.
+
 Failure messages are **trimmed to 200 lines** to stay safely under
 GitHub's 65 535-character comment limit; the full log is available
 as the `bats-unit-log` artefact.

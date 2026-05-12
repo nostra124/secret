@@ -82,14 +82,54 @@ The agent invokes the merge directly via
 it on the next webhook.
 
 The fallback is **not** an excuse to skip CI. If CI is pending or
-red, do not merge by hand. Wait for green (subscribe to the PR
-webhook via `subscribe_pr_activity` rather than polling), or file
-a bug if CI is red.
+red, do not merge by hand. Wait for the next webhook event (see
+§2b), or file a bug if CI is red.
 
 A reviewer who wants the repo-level toggle enabled — and so the
 agent stops doing manual merges — flips
 `Settings → General → Pull Requests → Allow auto-merge` once;
 subsequent PRs go through the full auto-merge path.
+
+## 2b. Listening for CI completion — never poll
+
+> **The agent MUST subscribe to PR activity webhooks and react to
+> events. Polling, sleeping, or otherwise blocking the session
+> while CI runs is forbidden — it hangs the session for the
+> minutes-to-hours it takes CI to finish.**
+
+Webhook events are delivered as `<github-webhook-activity>`
+messages that wake the session. Subscribe once per PR:
+
+```text
+mcp__github__subscribe_pr_activity pullNumber: <N>
+```
+
+Once subscribed, the agent receives **every** CI state transition:
+
+| Event | What the agent does |
+|---|---|
+| `check_run` `completed` with `conclusion: success` | Re-read prerequisites; if §1 is met enable auto-merge, otherwise execute the §2a manual fallback |
+| `check_run` `completed` with `conclusion: failure` | Open a bug per `skills/bugs.md`; do not merge |
+| `check_run` `completed` with `conclusion: cancelled` / `timed_out` / `action_required` | Treat as failure: investigate, file a bug if the cause is in the code, re-trigger CI if it's a flake |
+| `pull_request_review` `submitted` | If approving review unblocks merge, re-check prerequisites |
+| `issue_comment` / `pull_request_review_comment` | Read; act if actionable (per `skills/bugs.md`) |
+
+After enabling subscription, **end the turn**. The webhook will
+wake the session when there is something to do. Do not write
+`Bash sleep`, do not repeatedly call `pull_request_read
+get_check_runs`, do not chain status checks in a `while` loop —
+those patterns are explicitly prohibited and waste tokens while
+producing nothing.
+
+Two corollaries:
+
+1. The agent must distinguish **green** events (act: merge) from
+   **red** events (act: open a bug). Both arrive through the same
+   webhook stream; the `conclusion` field on the `check_run`
+   event is the discriminator.
+2. A subscription persists for the life of the PR; it survives
+   the session being suspended and resumed. No need to
+   re-subscribe on every commit push.
 
 ## 2. Mechanics — GitHub MCP
 
@@ -97,8 +137,10 @@ The MCP tools used here:
 
 | Tool | Purpose |
 |---|---|
+| `mcp__github__subscribe_pr_activity` | Subscribe to PR webhooks (mandatory — see §2b) |
+| `mcp__github__unsubscribe_pr_activity` | Stop receiving events for a PR |
 | `mcp__github__pull_request_read` (method `get`) | Inspect mergeable state, draft status, mergeable_state |
-| `mcp__github__pull_request_read` (method `get_check_runs`) | Confirm CI is green or pending |
+| `mcp__github__pull_request_read` (method `get_check_runs`) | Confirm CI is green or pending (called once per webhook event — never in a loop) |
 | `mcp__github__update_pull_request` | Set `draft: false` to mark ready-for-review |
 | `mcp__github__enable_pr_auto_merge` | Turn on auto-merge with a chosen merge method |
 | `mcp__github__disable_pr_auto_merge` | Turn it off (e.g. before force-pushing a fix) |
