@@ -71,8 +71,14 @@ installable; releases are tagged via `.rpk/version`.
 
 ## 8. Versioning
 
-Semver. Every release is recorded in `.rpk/versions`
+Semver. The canonical version lives in `VERSION` at
+the project root; `.rpk/version` is kept as a FEAT-194
+mirror. Every release is recorded in `.rpk/versions`
 (TSV ledger \(em no orphan SHAs per rpk's BUG-001
 lesson). Any change that breaks the bats contract in
 `tests/unit/secret.bats` requires a major version
 bump.
+
+See `skills/version.md` for the full release flow:
+where each version file lives, the semver decision
+rules, and the manual / `make package` release steps.

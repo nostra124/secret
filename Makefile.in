@@ -23,14 +23,15 @@ MANDIR    = @MANDIR@
 BUILD_DIR = build/$(PACKAGE)
 
 .PHONY: all install uninstall check check-unit check-vectors \
-        check-sit check-all lint test help package clean \
+        check-sit check-all lint test help package version clean \
         install-skills-user uninstall-skills-user
 
 all: install
 
 help:
 	@echo "Targets: install, uninstall, check, lint, check-sit, check-all,"
-	@echo "         install-skills-user, uninstall-skills-user, package, clean"
+	@echo "         install-skills-user, uninstall-skills-user,"
+	@echo "         package VERSION=x.y.z, version, clean"
 
 # Stow-based install builds a tree mirroring $PREFIX layout under
 # $(BUILD_DIR), then `stow -t $(PREFIX)` symlinks it. Symmetric
@@ -57,11 +58,13 @@ install:
 		cp -a share/doc/$(PACKAGE)/* \
 		      $(BUILD_DIR)$(DATADIR)/doc/$(PACKAGE)/; \
 	fi
-	# .rpk/version → $DATADIR/<pkg>/version : the runtime version
-	# string the binary reads (FEAT-194). The binary's two-path
-	# fallback resolves to this file when invoked as the installed
-	# entry, and to .rpk/version when invoked from a dev tree.
-	@if [ -f .rpk/version ]; then \
+	# VERSION (project-root canonical, FEAT-200-era) →
+	# $DATADIR/<pkg>/version : the runtime version string the
+	# binary reads. Falls back to .rpk/version (FEAT-194 legacy) if
+	# VERSION is absent — e.g. on freshly cloned older trees.
+	@if [ -f VERSION ]; then \
+		install -m 644 VERSION $(BUILD_DIR)$(DATADIR)/$(PACKAGE)/version; \
+	elif [ -f .rpk/version ]; then \
 		install -m 644 .rpk/version $(BUILD_DIR)$(DATADIR)/$(PACKAGE)/version; \
 	fi
 	@stow -d build -t $(PREFIX) $(PACKAGE)
@@ -119,7 +122,9 @@ uninstall-skills-user:
 		  -maxdepth 1 -name $$name -type l -delete 2>/dev/null || true; \
 	done
 
-# Versioning (FEAT-194)
+# Versioning (FEAT-194). VERSION at the project root is canonical;
+# .rpk/version is kept as a mirror for FEAT-194 backwards compat. See
+# skills/version.md for the release flow.
 package:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make package VERSION=x.y.z"; exit 1; \
@@ -128,10 +133,22 @@ package:
 		echo "Invalid semver: $(VERSION)"; exit 1; }
 	@printf '%s\t%s\n' "$(VERSION)" "$$(git rev-parse HEAD)" \
 		>> .rpk/versions
+	@echo "$(VERSION)" > VERSION
 	@echo "$(VERSION)" > .rpk/version
-	@git add .rpk/version .rpk/versions
+	@git add VERSION .rpk/version .rpk/versions
 	@git commit -m "package $(VERSION)"
 	@git tag "v$(VERSION)"
+
+# Print the currently-checked-out version. Resolution mirrors the
+# fallback order in bin/secret (VERSION → .rpk/version → hardcoded).
+version:
+	@if [ -f VERSION ]; then \
+		cat VERSION; \
+	elif [ -f .rpk/version ]; then \
+		cat .rpk/version; \
+	else \
+		echo "unknown"; \
+	fi
 
 # Per FEAT-191's invariant: clean never touches installed files.
 clean:

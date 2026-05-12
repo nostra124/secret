@@ -69,6 +69,18 @@ for tool in bash stow git; do
 	fi
 done
 
+# Resolve the package version. VERSION at the project root is the
+# canonical source (see skills/version.md). Fall back to .rpk/version
+# for trees that pre-date the VERSION convention.
+if [ -f VERSION ]; then
+	PACKAGE_VERSION=$(cat VERSION)
+elif [ -f .rpk/version ]; then
+	PACKAGE_VERSION=$(cat .rpk/version)
+else
+	echo "configure: no VERSION or .rpk/version file found" >&2
+	exit 1
+fi
+
 # Render Makefile from Makefile.in by substituting the variables.
 sed \
 	-e "s|@PACKAGE@|$PACKAGE|g" \
@@ -80,4 +92,4 @@ sed \
 	-e "s|@MANDIR@|$MANDIR|g" \
 	Makefile.in > Makefile
 
-echo "configured $PACKAGE for prefix=$PREFIX"
+echo "configured $PACKAGE $PACKAGE_VERSION for prefix=$PREFIX"
