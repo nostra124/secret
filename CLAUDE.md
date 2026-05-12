@@ -51,6 +51,17 @@ its own discoverable trigger:
   failing unit test that reproduces the bug lands
   before the fix.
 
+Planning happens through milestone backlog files
+(`issues/ROADMAP-<x.y.z>.md`) — see `skills/milestones.md`
+for the per-milestone session model, the shuffle protocol
+when work moves between releases, the `issues/done/`
+archive for resolved issues, and the retire commit that
+removes a `ROADMAP` file once the release ships.
+`skills/audit.md` describes the periodic traceability
+check that keeps `issues/` honest: every behaviour the
+software exhibits must map to at least one open or done
+issue.
+
 CI failures arrive as PR comments (see §7) — treat
 each as a new bug per `skills/bugs.md`.
 
