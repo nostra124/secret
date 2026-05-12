@@ -5,11 +5,36 @@ description: |
   user asks how to run tests, why CI failed, where SIT lives, how
   pre-push works, or how to add a new test tier. Covers the three
   surfaces (unit / SIT / PIT), the environment-detecting pre-push
-  hook, and the GitHub Actions workflow that posts failure logs back
-  to the PR as comments.
+  hook, and the GitHub Actions workflow that gates merging by
+  posting failure logs back to the PR as comments.
 ---
 
-# `testing` skill — three tiers, two environments
+# `testing` skill — local first, CI mandatory
+
+## 0. The workflow rule
+
+> **Local tests are the primary signal. CI is the merge gate. Every
+> change must satisfy both, in that order.**
+
+Day-to-day development is driven by local runs. CI exists to catch
+the long tail (environment drift, missing-dependency guards) and to
+gate merging — it is **not** where you discover whether your change
+works.
+
+The order of every change:
+
+```
+1. Edit code.
+2. Run unit tests locally          → must be green.
+3. Run SIT/PIT locally (if podman) → must be green.
+4. Commit, push.
+5. CI runs the unit suite          → MUST be green before merge.
+6. Reviewer approves               → merge.
+```
+
+Steps 2–3 are enforced by `etc/hooks/pre-push` (see §3). Step 5 is
+the **mandatory** GitHub Actions check — see §4. A red CI is a
+blocking failure regardless of any local-only signal.
 
 ## 1. The three test tiers
 
@@ -32,24 +57,27 @@ Scope rules (also enforced by `tests/unit/secret.bats:1-16`):
   layout, man page lookup, version-file resolution after `make
   install`, `./configure --prefix=...` permutations.
 
-The unit suite is the only one that runs in CI today. SIT and PIT
-are desktop-only (see §3).
+## 2. Running tests locally (start here)
 
-## 2. Running tests locally
+Local is the **first signal** for every change. If your change
+touches `bin/secret`, you must run the unit suite locally before
+committing — the pre-push hook will enforce it, but you should
+not rely on the hook as your first check.
 
 ```sh
-# Unit only (no podman needed)
+# Unit only — fastest, no podman needed. Run this every save.
 make check-unit
 # or directly:
 bats tests/unit/*.bats
 
-# SIT only — needs podman
+# SIT — needs podman. Run when touching anything that uses gpg/pass.
 make check-sit
 
-# PIT only — needs podman
+# PIT — needs podman. Run when touching configure / Makefile /
+# share/secret/version resolution.
 make check-pit
 
-# Everything
+# Everything (soft-skips tiers whose prerequisites are missing).
 make check-all
 ```
 
@@ -57,15 +85,23 @@ Each `check-*` target soft-skips with a clear message when its
 prerequisite is missing, so `make check-all` is safe to run in any
 environment.
 
-## 3. The pre-push hook (`etc/hooks/pre-push`)
+**Rule of thumb**: a change that crosses a tier boundary requires
+running that tier locally. Adding a subcommand → unit. Touching
+GPG invocation → unit + SIT. Touching `configure` or `make install`
+→ unit + PIT.
 
-`etc/hooks/pre-push` is the versioned hook that runs before every
-`git push`. Install it once per clone with:
+## 3. The pre-push hook (`etc/hooks/pre-push`) — local gate
+
+`etc/hooks/pre-push` is the versioned hook that enforces local
+tests before every `git push`. Install it once per clone:
 
 ```sh
 make install-hooks    # symlinks etc/hooks/* into .git/hooks/
 make uninstall-hooks  # removes the symlinks
 ```
+
+`make install-hooks` is part of the standard post-clone checklist
+alongside `./configure`. Do it on every fresh clone.
 
 Decision logic (mirrors `skills/testing.md` so they cannot drift):
 
@@ -86,11 +122,16 @@ push exercised:
 | Desktop with podman | ✓ | ✓ (if present) | ✓ (if present) |
 | CI (GitHub Actions) | ✓ | ✗ (intentional — SIT runs on desktop only) | ✗ |
 
-**Skipping the hook**: `SECRET_SKIP_TESTS=1 git push` is reserved for
-docs-only or roadmap-only pushes that don't touch `bin/secret`. Use
-sparingly — the next CI run still has to pass.
+**Bypassing the hook is reserved for true exceptions**:
+`SECRET_SKIP_TESTS=1 git push` for docs-only or roadmap-only pushes
+that don't touch any tested file. Use sparingly — the next CI run
+still has to pass, and reviewers will look skeptically at a bypass
+on a code change.
 
-## 4. GitHub Actions workflow (`.github/workflows/test.yml`)
+## 4. CI is mandatory (`.github/workflows/test.yml`)
+
+> A green CI run is **required** to merge into `master`. A red CI
+> blocks the merge even if local tests passed; investigate and fix.
 
 - Triggers on every PR and on `push` to `master`.
 - Installs `bats`, runs `bats tests/unit/*.bats`, captures the
@@ -101,17 +142,31 @@ sparingly — the next CI run still has to pass.
   back to the workflow run and the offending commit SHA.
 - Always uploads the full log as a 7-day artefact.
 
-Why post failures as PR comments:
+The PR-comment behaviour is intentional and load-bearing:
 
-- Lets reviewers (and the Claude assistant subscribed to the PR via
-  `subscribe_pr_activity`) see the failure inline.
-- Survives the workflow log being purged.
-- Triggers a `pull_request_comment` webhook, which is what wakes the
-  Claude session listening on the PR.
+- Reviewers see the failure inline without leaving the PR.
+- It survives the workflow log being purged.
+- It triggers a `pull_request_comment` webhook, which wakes any
+  Claude session subscribed to the PR via `subscribe_pr_activity`.
 
 Failure messages are **trimmed to 200 lines** to stay safely under
 GitHub's 65 535-character comment limit; the full log is available
 as the `bats-unit-log` artefact.
+
+### Enforcing the mandate at the repo level
+
+Branch protection on `master` should require the `unit` check
+before merging. Configure under `Settings → Branches → Branch
+protection rules`:
+
+- ✅ Require status checks to pass before merging
+- ✅ Require branches to be up to date before merging
+- Selected checks: `unit`
+
+This makes the "CI mandatory" rule machine-enforced rather than
+relying on reviewer discipline. Until that is configured, the
+mandate is by convention — reviewers must check the CI status
+themselves.
 
 ## 5. Adding tests
 
@@ -159,6 +214,11 @@ as the `bats-unit-log` artefact.
   `pull-requests: write` permission. Forks running on the default
   `GITHUB_TOKEN` may receive a read-only token; the comment step
   exits cleanly in that case and the artefact is the fallback.
+- **"It worked locally but CI failed"** — almost always an
+  environment leak (uninstalled dependency, ambient `$XDG_*` var,
+  cached `.password-store`). Reproduce in a clean container:
+  `podman run --rm -v $PWD:/work -w /work debian:stable bash -c \
+   'apt-get update && apt-get install -y bats && bats tests/unit/*.bats'`.
 
 ## 7. Where each tier's contract is recorded
 
