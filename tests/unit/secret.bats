@@ -14,6 +14,8 @@
 # (line 64 of bin/secret). When set, $SELF_CONFIG resolves to that
 # path verbatim, bypassing the EUID branch entirely.
 
+bats_require_minimum_version 1.5.0
+
 setup() {
 	BATS_TMPDIR=${BATS_TMPDIR:-$(mktemp -d)}
 	SELF_CONFIG="$(mktemp -d "$BATS_TMPDIR/secret-stores.XXXXXX")"
@@ -301,6 +303,26 @@ teardown() {
 	run "$SECRET_BIN" get nope/version
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"store nope does not exist"* ]]
+}
+
+# Logging contract — see skills/logging.md. The four supported
+# levels are debug / info / warn / error. fatal() is the
+# error+exit convenience used by validation paths.
+
+@test "get on existing store with missing param emits error level (not warn)" {
+	mkdir -p "$SELF_CONFIG/mystore"
+	run "$SECRET_BIN" get mystore/missing
+	# A missing parameter inside an existing store is an error,
+	# not a warning — the operation failed and the caller needs
+	# to know.
+	[[ "$output" == *"error"* ]]
+	[[ "$output" == *"mystore/missing"* ]]
+}
+
+@test "secret -d version tagged 'debug -' on stderr" {
+	run --separate-stderr "$SECRET_BIN" -d version
+	[ "$status" -eq 0 ]
+	[[ "$stderr" == *"debug -"* ]]
 }
 
 @test "del without arg exits non-zero" {

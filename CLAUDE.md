@@ -28,11 +28,35 @@ dispatcher with `command:<verb>` functions. No plugins
 in `libexec/secret/` today; if a future plugin lands,
 it follows FEAT-001's libexec lookup pattern.
 
+Logging: four levels (`debug` / `info` / `warn` /
+`error`) plus a `fatal` convenience (= error + exit).
+See `skills/logging.md` for when to use each, the
+env-var switches (`SELF_DEBUG`, `SELF_QUIET`), and the
+output-format contract tests pin against.
+
 ## 3. Issue authoring
 
 Same as `CLAUDE.md.foundation`. Frontmatter with
 `id: FEAT-NNN`. **Bugs come before features at the same
 priority level.**
+
+The mechanics are split across two skills so each has
+its own discoverable trigger:
+
+- `skills/features.md` — how to author a feature issue
+  (`type: feature`), user story format, acceptance
+  criteria.
+- `skills/bugs.md` — how to author a bug issue
+  (`type: bug`) and the **mandatory TDD workflow**: a
+  failing unit test that reproduces the bug lands
+  before the fix.
+
+CI failures arrive as PR comments (see §7) — treat
+each as a new bug per `skills/bugs.md`.
+
+When merging, follow `skills/automerging.md`: every
+PR that has been reviewed and whose tests pass should
+auto-merge through the GitHub gate.
 
 ## 4. The no-shared-lib policy
 
