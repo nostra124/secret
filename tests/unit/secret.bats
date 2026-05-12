@@ -121,6 +121,21 @@ teardown() {
 	[[ "$output" == *"password-store"* ]]
 }
 
+# FEAT-203 — stores listing must survive a SELF_CONFIG path with a
+# space in it. command:stores is the canary; the full deep-quoting
+# refactor for every subcommand is tracked in FEAT-213.
+
+@test "stores lists store directories under a SELF_CONFIG with a space" {
+	# Re-point SELF_CONFIG to a path containing a space and seed
+	# one store.
+	SPACED="$BATS_TMPDIR/with space/$(date +%N).XXXXXX"
+	mkdir -p "$SPACED/alpha"
+	XDG_SECRET_STORES="$SPACED" run "$SECRET_BIN" stores
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"alpha"* ]]
+	rm -rf "$SPACED"
+}
+
 # ---------------------------------------------------------------------------
 # exists
 # ---------------------------------------------------------------------------

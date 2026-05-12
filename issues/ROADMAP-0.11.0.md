@@ -23,6 +23,7 @@ semver-justification: >
 | [FEAT-210](bug/210-command-clean-not-implemented.md) | bug | `command:clean` advertised in help but not implemented | medium |
 | [FEAT-211](bug/211-remotes-no-args-infinite-recursion.md) | bug | `command:remotes` infinite-recurses with no args and no stores | medium |
 | [FEAT-212](bug/212-ins-rem-mask-exit-code.md) | bug | `command:ins` and `command:rem` mask all error exits via `return 0` | medium |
+| [FEAT-213](feature/213-deep-sc2086-quoting-cleanup.md) | feature | Deep SC2086 quoting cleanup (225 instances; follow-up to FEAT-203) | low |
 | [FEAT-205](feature/205-test-dispatcher-destroy-flags.md) | feature | Add tests for `store/param` dispatcher shortcut, `destroy password-store`, and flag parsing | medium |
 | [FEAT-206](feature/206-tighten-existing-test-assertions.md) | feature | Tighten loose assertions: add status checks, verify version content, separate stderr | low |
 | [FEAT-208](feature/208-normalise-params-sort.md) | feature | Normalise `sort -u` in `command:params` for password-store | low |
