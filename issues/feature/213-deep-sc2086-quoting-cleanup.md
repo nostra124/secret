@@ -2,7 +2,8 @@
 id: FEAT-213
 type: feature
 priority: low
-status: open
+status: resolved
+resolved-in: 0.12.0
 ---
 
 # Deep SC2086 cleanup — quote all variable expansions in `bin/secret`
