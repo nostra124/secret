@@ -2,7 +2,9 @@
 id: FEAT-042
 type: feature
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.9.0
+resolved-by-audit: audits/audit-2026-05-13.md
 ---
 
 # `secret(1)` man page
