@@ -2,7 +2,8 @@
 id: FEAT-215
 type: feature
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.13.0
 follows: FEAT-030
 discovered-by: audits/audit-2026-05-13.md
 ---
