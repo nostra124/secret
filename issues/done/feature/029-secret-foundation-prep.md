@@ -2,7 +2,9 @@
 id: FEAT-029
 type: feature
 priority: high
-status: open
+status: resolved
+resolved-in: 0.9.0
+resolved-by-audit: audits/audit-2026-05-13.md
 ---
 
 # Make `secret` depend only on `account` and `config` at runtime
