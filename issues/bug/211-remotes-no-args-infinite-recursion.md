@@ -2,7 +2,8 @@
 id: FEAT-211
 type: bug
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.11.0
 ---
 
 # `command:remotes` infinite-recurses when called with no args and no stores

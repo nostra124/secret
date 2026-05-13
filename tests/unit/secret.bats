@@ -494,18 +494,43 @@ teardown() {
 	[[ "$output" == *"format <store>/<param>"* ]]
 }
 
-# ins / rem — validation tests deferred to FEAT-212. Both functions
-# end with an unconditional `return 0`, swallowing the fatal exits
-# from command:get/set. Once FEAT-212 lands, two tests pinning the
-# missing-arg and bad-format paths land here.
+# ins / rem — FEAT-212 hoisted the argument-validation guards
+# directly into both functions and removed the unconditional
+# `return 0`. Tests pin the missing-arg and bad-format paths.
 
-# remotes — happy-ish path: a store directory exists, command:remotes
-# falls into the recursive branch with $@=loner, pushd's in, runs
-# `git remote` (empty for a non-git dir).
-#
-# The "no stores at all" case is deferred to FEAT-211: command:remotes
-# currently infinite-recurses when both args and stores are empty
-# (same pattern FEAT-200 fixed in command:gpg-keys).
+@test "ins without arg exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN ins"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a parameter"* ]]
+}
+
+@test "ins without slash separator exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN ins storealone"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"format <store>/<param>"* ]]
+}
+
+@test "rem without arg exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN rem"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a parameter"* ]]
+}
+
+@test "rem without slash separator exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN rem storealone"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"format <store>/<param>"* ]]
+}
+
+# remotes — FEAT-211 fixed the no-stores infinite recursion with the
+# same guard pattern FEAT-200 introduced for gpg-keys. Tests pin
+# both the no-stores and seeded-store cases.
+
+@test "remotes with no stores returns empty success (FEAT-211)" {
+	run "$SECRET_BIN" remotes
+	[ "$status" -eq 0 ]
+	[ -z "$output" ]
+}
 
 @test "remotes with a store that has no git remotes returns empty success" {
 	mkdir -p "$SELF_CONFIG/loner"
@@ -559,9 +584,31 @@ teardown() {
 	[ "$status" -ne 0 ]
 }
 
-# clean — deferred. FEAT-210 tracks the missing command:clean
-# implementation; once it ships, two tests land here ("clean without
-# arg exits non-zero", "clean on missing store exits 0 (no-op)").
+# clean — FEAT-210 implemented command:clean as "remove empty
+# .gpg files from a store". Option A chosen over Option B
+# (removing the help-text line).
+
+@test "clean without arg exits non-zero (FEAT-210)" {
+	run "$SECRET_BIN" clean
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a store"* ]]
+}
+
+@test "clean on missing store exits non-zero with fatal (FEAT-210)" {
+	run "$SECRET_BIN" clean nope
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"store nope does not exist"* ]]
+}
+
+@test "clean removes empty .gpg files but keeps non-empty ones (FEAT-210)" {
+	mkdir -p "$SELF_CONFIG/mystore"
+	touch "$SELF_CONFIG/mystore/empty.gpg"
+	echo "real ciphertext payload" > "$SELF_CONFIG/mystore/keep.gpg"
+	run "$SECRET_BIN" clean mystore
+	[ "$status" -eq 0 ]
+	[ ! -e "$SELF_CONFIG/mystore/empty.gpg" ]
+	[ -e "$SELF_CONFIG/mystore/keep.gpg" ]
+}
 
 # pass-init's missing-dependency guard is exercised in the SIT suite
 # (the per-distro Dockerfiles let us run with and without the gpg /
