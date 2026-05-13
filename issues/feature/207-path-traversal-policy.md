@@ -2,7 +2,9 @@
 id: FEAT-207
 type: feature
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.10.0
+decision: Option A (reject) — chosen 2026-05-12 as the security-conscious default. `..` segments in store and parameter names now produce a fatal exit. The bats contract gains new "reject `..`" tests; existing assertions are unchanged.
 ---
 
 # Define and enforce path-traversal policy for store and parameter names

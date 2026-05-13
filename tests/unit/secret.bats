@@ -121,6 +121,21 @@ teardown() {
 	[[ "$output" == *"password-store"* ]]
 }
 
+# FEAT-203 — stores listing must survive a SELF_CONFIG path with a
+# space in it. command:stores is the canary; the full deep-quoting
+# refactor for every subcommand is tracked in FEAT-213.
+
+@test "stores lists store directories under a SELF_CONFIG with a space" {
+	# Re-point SELF_CONFIG to a path containing a space and seed
+	# one store.
+	SPACED="$BATS_TMPDIR/with space/$(date +%N).XXXXXX"
+	mkdir -p "$SPACED/alpha"
+	XDG_SECRET_STORES="$SPACED" run "$SECRET_BIN" stores
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"alpha"* ]]
+	rm -rf "$SPACED"
+}
+
 # ---------------------------------------------------------------------------
 # exists
 # ---------------------------------------------------------------------------
@@ -395,6 +410,158 @@ teardown() {
 	[ "$status" -eq 0 ]
 	[ -n "$output" ]
 }
+
+# ---------------------------------------------------------------------------
+# FEAT-207 — path-traversal policy. `..` segments in store or parameter
+# names are rejected at the parser level so resolved file paths cannot
+# escape $SELF_CONFIG. Centralised in the validate_name helper.
+# ---------------------------------------------------------------------------
+
+@test "exists rejects '..' in store name" {
+	run "$SECRET_BIN" exists ../foo
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "params rejects '..' in store name" {
+	run "$SECRET_BIN" params ../foo
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "has rejects '..' anywhere in <store>/<param>" {
+	run "$SECRET_BIN" has store/../escape
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "get rejects '..' as store component" {
+	run "$SECRET_BIN" get ../etc/passwd
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "set rejects '..' as parameter component" {
+	run bash -c "echo x | $SECRET_BIN set store/../escape"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+@test "destroy rejects '..' in store name" {
+	run "$SECRET_BIN" destroy ../foo
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"path traversal"* ]]
+}
+
+# Sanity check: a legitimate name containing two single dots (not
+# adjacent) is allowed.
+@test "exists allows store names with non-traversal dots" {
+	mkdir -p "$SELF_CONFIG/foo.bar.baz"
+	run "$SECRET_BIN" exists foo.bar.baz
+	[ "$status" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
+# FEAT-204 — argument-validation coverage for subcommands whose happy
+# paths require gpg / pass / qrencode / $EDITOR / network. We only
+# exercise the early-exit paths here; full behaviour belongs in SIT.
+# ---------------------------------------------------------------------------
+
+# gen / def — both expect <store>/<param> and fatal on missing or
+# malformed arguments.
+
+@test "gen without arg exits non-zero" {
+	run "$SECRET_BIN" gen
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a parameter"* ]]
+}
+
+@test "gen without slash separator exits non-zero" {
+	run "$SECRET_BIN" gen storealone
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"format <store>/<param>"* ]]
+}
+
+@test "def without arg exits non-zero" {
+	run "$SECRET_BIN" def
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a parameter"* ]]
+}
+
+@test "def without slash separator exits non-zero" {
+	run "$SECRET_BIN" def storealone
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"format <store>/<param>"* ]]
+}
+
+# ins / rem — validation tests deferred to FEAT-212. Both functions
+# end with an unconditional `return 0`, swallowing the fatal exits
+# from command:get/set. Once FEAT-212 lands, two tests pinning the
+# missing-arg and bad-format paths land here.
+
+# remotes — happy-ish path: a store directory exists, command:remotes
+# falls into the recursive branch with $@=loner, pushd's in, runs
+# `git remote` (empty for a non-git dir).
+#
+# The "no stores at all" case is deferred to FEAT-211: command:remotes
+# currently infinite-recurses when both args and stores are empty
+# (same pattern FEAT-200 fixed in command:gpg-keys).
+
+@test "remotes with a store that has no git remotes returns empty success" {
+	mkdir -p "$SELF_CONFIG/loner"
+	run "$SECRET_BIN" remotes
+	[ "$status" -eq 0 ]
+}
+
+# add-gpg-key / del-gpg-key / has-gpg-key — fatal on missing args.
+# The happy paths go through `account` + gpg and belong to SIT.
+
+@test "add-gpg-key without store arg exits non-zero" {
+	run "$SECRET_BIN" add-gpg-key
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a store"* ]]
+}
+
+@test "add-gpg-key without account arg exits non-zero" {
+	run "$SECRET_BIN" add-gpg-key mystore
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify an account"* ]]
+}
+
+@test "del-gpg-key without store arg exits non-zero" {
+	run "$SECRET_BIN" del-gpg-key
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a store"* ]]
+}
+
+@test "del-gpg-key without account arg exits non-zero" {
+	run "$SECRET_BIN" del-gpg-key mystore
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify an account"* ]]
+}
+
+@test "has-gpg-key without store arg exits non-zero" {
+	run "$SECRET_BIN" has-gpg-key
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a store"* ]]
+}
+
+@test "has-gpg-key without account arg exits non-zero" {
+	run "$SECRET_BIN" has-gpg-key mystore
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify an account"* ]]
+}
+
+@test "has-gpg-key returns non-zero when store lacks the key file" {
+	mkdir -p "$SELF_CONFIG/mystore/.gpg"
+	# no .pub file in .gpg/ for 'noone'
+	run "$SECRET_BIN" has-gpg-key mystore noone
+	[ "$status" -ne 0 ]
+}
+
+# clean — deferred. FEAT-210 tracks the missing command:clean
+# implementation; once it ships, two tests land here ("clean without
+# arg exits non-zero", "clean on missing store exits 0 (no-op)").
 
 # pass-init's missing-dependency guard is exercised in the SIT suite
 # (the per-distro Dockerfiles let us run with and without the gpg /

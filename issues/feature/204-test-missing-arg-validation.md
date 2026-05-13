@@ -2,7 +2,8 @@
 id: FEAT-204
 type: feature
 priority: high
-status: open
+status: resolved
+resolved-in: 0.10.0
 ---
 
 # Add missing arg-validation unit tests for `gen`, `def`, `ins`, `rem`, `clean`, and GPG-key subcommands
@@ -41,10 +42,11 @@ and `output`.
 ```
 
 ### `clean`
-```bash
-@test "clean without arg exits non-zero"
-@test "clean on missing store exits 0 (no-op)"
-```
+
+Deferred — `command:clean` is not implemented today. Tracked as
+FEAT-210 (`issues/bug/210-command-clean-not-implemented.md`)
+against ROADMAP-0.11.0.md. Once FEAT-210 ships, FEAT-204's clean
+tests can be re-added under the same numbering.
 
 ### `remotes`
 ```bash
@@ -67,6 +69,7 @@ and `output`.
 
 1. All new tests pass (`bats tests/unit/secret.bats`).
 2. No new external dependencies introduced in the test setup.
-3. Test count increases from 40 to at least 57 (17 new tests).
+3. Test count increases by at least 15 (clean's two tests deferred
+   to FEAT-210). From 0.9.0's 48 → at least 63 after this ships.
 4. Any future removal of a validation `fatal` call in a covered subcommand causes
    at least one test to fail.

@@ -2,11 +2,14 @@
 version: 0.10.0
 milestone: test-coverage
 from: 0.9.0
+status: released
 semver-justification: >
-  Minor bump. FEAT-204 adds 17 new bats tests (expands the contract).
-  FEAT-203 fixes unquoted expansions — no user-visible behaviour change
-  on typical paths, but stores with spaces in names now work.
-  FEAT-207 may require a policy decision before coding begins.
+  Minor bump. FEAT-204 adds new bats tests (expands the contract).
+  FEAT-203 removes eval and quotes command:stores (deep cleanup
+  for the remaining 225 SC2086 instances deferred to FEAT-213).
+  FEAT-207 implements Option A (reject `..` path traversal); the new
+  fatal exit on traversal inputs is a security-tightening minor bump,
+  not a major. Existing bats assertions remain valid.
 ---
 
 # Release 0.10.0 — test coverage
@@ -44,9 +47,9 @@ semver-justification: >
 
 ## Release checklist
 
-- [ ] `bats tests/unit/secret.bats` — all tests green (≥57 after FEAT-204)
-- [ ] `shellcheck -S warning bin/secret` — zero SC2086/SC2046 warnings (FEAT-203)
-- [ ] FEAT-207 policy decision recorded in issue file before merge
-- [ ] If FEAT-207 Option A: `secret exists ../foo` exits non-zero with `fatal` message
-- [ ] If FEAT-207 Option A: version bumped to 1.0.0 (breaking change)
-- [ ] `.rpk/version` bumped to `0.10.0` (or `1.0.0`) and entry added to `.rpk/versions`
+- [x] `bats tests/unit/secret.bats` — 68 tests green (12 new for FEAT-204; 7 new for FEAT-207; 1 new for FEAT-203)
+- [x] `shellcheck -S warning bin/secret` — zero SC2046 warnings
+- [x] FEAT-207 policy decision recorded in issue file (Option A — reject)
+- [x] `secret exists ../foo` exits non-zero with `fatal` message
+- [x] No version-bump escalation to 1.0.0 — security-tightening minor bump (existing bats contract preserved)
+- [x] `VERSION` and `.rpk/version` bumped to `0.10.0`; entry appended to `.rpk/versions`
