@@ -2,7 +2,8 @@
 id: FEAT-212
 type: bug
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.11.0
 ---
 
 # `command:ins` and `command:rem` mask all error exits

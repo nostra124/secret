@@ -51,20 +51,64 @@ teardown() {
 	[ -n "$output" ]
 }
 
+# FEAT-206: pin `secret version` output to the canonical VERSION
+# file. If they diverge, the version contract (skills/version.md
+# §6) is broken.
+@test "secret version output matches VERSION file (FEAT-206)" {
+	expected=$(cat "$BATS_TEST_DIRNAME/../../VERSION")
+	run "$SECRET_BIN" version
+	[ "$status" -eq 0 ]
+	[ "$output" = "$expected" ]
+}
+
 @test "secret help prints usage" {
 	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
 	[ -n "$output" ]
 }
 
 @test "secret with no args prints help" {
 	run "$SECRET_BIN"
+	[ "$status" -eq 0 ]
 	[ -n "$output" ]
 }
 
-@test "unknown subcommand exits non-zero with fatal message" {
-	run "$SECRET_BIN" definitely-not-a-real-subcommand
+@test "unknown subcommand exits non-zero with fatal message (FEAT-206)" {
+	# FEAT-206: tighten by asserting the fatal message lands on
+	# stderr specifically (not just somewhere in combined output).
+	run --separate-stderr "$SECRET_BIN" definitely-not-a-real-subcommand
 	[ "$status" -ne 0 ]
-	[[ "$output" == *"fatal"* ]]
+	[[ "$stderr" == *"fatal"* ]]
+	[[ "$stderr" == *"unknown command"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# FEAT-205 — dispatcher shortcut. When $1 looks like <store>/<param>
+# and the .gpg file exists, the dispatcher (`bin/secret` final block)
+# routes directly to command:get and exits. When the file is absent,
+# the shortcut does not trigger and the normal "unknown command"
+# fatal fires.
+# ---------------------------------------------------------------------------
+
+@test "store/param shortcut routes to command:get when .gpg exists (FEAT-205)" {
+	mkdir -p "$SELF_CONFIG/mystore"
+	# Seed a .gpg file so command:has succeeds and the dispatcher
+	# takes the shortcut. command:get itself will fail in the
+	# absence of real gpg, but the dispatcher block ends with
+	# `exit 0` once the shortcut is taken.
+	touch "$SELF_CONFIG/mystore/version.gpg"
+	run "$SECRET_BIN" mystore/version
+	[ "$status" -eq 0 ]
+}
+
+@test "store/param shortcut falls through to unknown-command when .gpg absent (FEAT-205)" {
+	# No .gpg file exists, so command:has returns non-zero. The
+	# dispatcher then tries `has command $1` which fails (there
+	# is no command:mystore/version function) → unknown-command
+	# fatal.
+	run "$SECRET_BIN" missing/param
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"unknown command"* ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -73,26 +117,31 @@ teardown() {
 
 @test "secret help mentions pass-init (FEAT-041)" {
 	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
 	echo "$output" | grep -q pass-init
 }
 
 @test "help mentions store management commands" {
 	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
 	[[ "$output" == *"store management commands"* ]]
 }
 
 @test "help mentions store parameter commands" {
 	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
 	[[ "$output" == *"store parameter commands"* ]]
 }
 
 @test "help mentions account encryption commands" {
 	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
 	[[ "$output" == *"account encryption commands"* ]]
 }
 
 @test "help mentions sync commands group" {
 	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
 	[[ "$output" == *"synchronisation commands"* ]]
 }
 
@@ -185,6 +234,18 @@ teardown() {
 	[[ "$output" != *"host/name"* ]]
 }
 
+@test "params password-store output is sorted (FEAT-208)" {
+	mkdir -p "$HOME/.password-store"
+	touch "$HOME/.password-store/zebra.gpg"
+	touch "$HOME/.password-store/alpha.gpg"
+	touch "$HOME/.password-store/mango.gpg"
+	run "$SECRET_BIN" params password-store
+	[ "$status" -eq 0 ]
+	# Output should be sorted alphabetically.
+	expected=$'alpha\nmango\nzebra'
+	[ "$output" = "$expected" ]
+}
+
 @test "params on missing store returns empty success" {
 	run "$SECRET_BIN" params no-such-store
 	[ "$status" -eq 0 ]
@@ -261,9 +322,32 @@ teardown() {
 	[[ "$output" != *"beta/key2"* ]]
 }
 
+# FEAT-209: command:ls now uses `grep -i` on the prefix filter so a
+# mixed-case query (`secret ls Alpha`) returns the same results as
+# the lowercase form (`secret ls alpha`). The store directories
+# themselves are normalised to lowercase by command:init at creation
+# time, so on-disk names stay consistent.
+
+@test "ls is case-insensitive on the query prefix (FEAT-209)" {
+	mkdir -p "$SELF_CONFIG/alpha"
+	touch "$SELF_CONFIG/alpha/key1.gpg"
+	# Lowercase form (baseline).
+	run "$SECRET_BIN" ls alpha
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"alpha/key1"* ]]
+	# Mixed-case form must return the same result.
+	run "$SECRET_BIN" ls Alpha
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"alpha/key1"* ]]
+	# Uppercase form too.
+	run "$SECRET_BIN" ls ALPHA
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"alpha/key1"* ]]
+}
+
 # ---------------------------------------------------------------------------
-# destroy — file removal (skip the password-store branch which would
-# rm -rf $HOME/.password-store on the dev machine)
+# destroy — file removal. FEAT-205 enabled the password-store branch
+# now that setup() sandboxes $HOME.
 # ---------------------------------------------------------------------------
 
 @test "destroy removes the store directory" {
@@ -276,6 +360,19 @@ teardown() {
 
 @test "destroy of unknown store is a no-op" {
 	run "$SECRET_BIN" destroy never-existed
+	[ "$status" -eq 0 ]
+}
+
+@test "destroy password-store removes ~/.password-store (FEAT-205)" {
+	mkdir -p "$HOME/.password-store"
+	touch "$HOME/.password-store/foo.gpg"
+	run "$SECRET_BIN" destroy password-store
+	[ "$status" -eq 0 ]
+	[ ! -d "$HOME/.password-store" ]
+}
+
+@test "destroy password-store is a no-op when ~/.password-store absent (FEAT-205)" {
+	run "$SECRET_BIN" destroy password-store
 	[ "$status" -eq 0 ]
 }
 
@@ -494,18 +591,43 @@ teardown() {
 	[[ "$output" == *"format <store>/<param>"* ]]
 }
 
-# ins / rem — validation tests deferred to FEAT-212. Both functions
-# end with an unconditional `return 0`, swallowing the fatal exits
-# from command:get/set. Once FEAT-212 lands, two tests pinning the
-# missing-arg and bad-format paths land here.
+# ins / rem — FEAT-212 hoisted the argument-validation guards
+# directly into both functions and removed the unconditional
+# `return 0`. Tests pin the missing-arg and bad-format paths.
 
-# remotes — happy-ish path: a store directory exists, command:remotes
-# falls into the recursive branch with $@=loner, pushd's in, runs
-# `git remote` (empty for a non-git dir).
-#
-# The "no stores at all" case is deferred to FEAT-211: command:remotes
-# currently infinite-recurses when both args and stores are empty
-# (same pattern FEAT-200 fixed in command:gpg-keys).
+@test "ins without arg exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN ins"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a parameter"* ]]
+}
+
+@test "ins without slash separator exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN ins storealone"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"format <store>/<param>"* ]]
+}
+
+@test "rem without arg exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN rem"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a parameter"* ]]
+}
+
+@test "rem without slash separator exits non-zero (FEAT-212)" {
+	run bash -c "echo | $SECRET_BIN rem storealone"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"format <store>/<param>"* ]]
+}
+
+# remotes — FEAT-211 fixed the no-stores infinite recursion with the
+# same guard pattern FEAT-200 introduced for gpg-keys. Tests pin
+# both the no-stores and seeded-store cases.
+
+@test "remotes with no stores returns empty success (FEAT-211)" {
+	run "$SECRET_BIN" remotes
+	[ "$status" -eq 0 ]
+	[ -z "$output" ]
+}
 
 @test "remotes with a store that has no git remotes returns empty success" {
 	mkdir -p "$SELF_CONFIG/loner"
@@ -559,9 +681,31 @@ teardown() {
 	[ "$status" -ne 0 ]
 }
 
-# clean — deferred. FEAT-210 tracks the missing command:clean
-# implementation; once it ships, two tests land here ("clean without
-# arg exits non-zero", "clean on missing store exits 0 (no-op)").
+# clean — FEAT-210 implemented command:clean as "remove empty
+# .gpg files from a store". Option A chosen over Option B
+# (removing the help-text line).
+
+@test "clean without arg exits non-zero (FEAT-210)" {
+	run "$SECRET_BIN" clean
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"please specify a store"* ]]
+}
+
+@test "clean on missing store exits non-zero with fatal (FEAT-210)" {
+	run "$SECRET_BIN" clean nope
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"store nope does not exist"* ]]
+}
+
+@test "clean removes empty .gpg files but keeps non-empty ones (FEAT-210)" {
+	mkdir -p "$SELF_CONFIG/mystore"
+	touch "$SELF_CONFIG/mystore/empty.gpg"
+	echo "real ciphertext payload" > "$SELF_CONFIG/mystore/keep.gpg"
+	run "$SECRET_BIN" clean mystore
+	[ "$status" -eq 0 ]
+	[ ! -e "$SELF_CONFIG/mystore/empty.gpg" ]
+	[ -e "$SELF_CONFIG/mystore/keep.gpg" ]
+}
 
 # pass-init's missing-dependency guard is exercised in the SIT suite
 # (the per-distro Dockerfiles let us run with and without the gpg /

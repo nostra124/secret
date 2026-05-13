@@ -2,7 +2,9 @@
 id: FEAT-210
 type: bug
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.11.0
+decision: Option A — `command:clean` now removes empty `.gpg` files from the store directory.
 ---
 
 # `command:clean` is advertised in help but not implemented

@@ -131,6 +131,39 @@ Two corollaries:
    the session being suspended and resumed. No need to
    re-subscribe on every commit push.
 
+## 2c. Reconcile on every wake — the webhook is best-effort
+
+> **At the start of every response turn, if `subscribe_pr_activity`
+> is active for any PR, call `pull_request_read get_check_runs`
+> and `pull_request_read get` once per PR before doing anything
+> else. If state has changed since the last action — CI now
+> green, `mergeable_state` now `clean`, a new review thread, etc.
+> — act on the new state immediately.**
+
+Webhook delivery is best-effort, the reconcile is not. Events can
+be lost when:
+
+- The session is suspended at the moment the event fires.
+- The MCP server hosting the subscription disconnects briefly.
+- The webhook fires before the session is fully resumed.
+
+Empirically observed on `nostra124/secret#2`: CI went green but
+the `check_run.completed` event never reached the session; the
+PR sat as draft until the user prompted "why is the PR still
+open?" The fix is one API call per PR per turn — bounded, cheap,
+and immune to webhook drop.
+
+This is **not** polling. Polling is "check repeatedly while
+nothing changes". Reconciling is "check once when something
+*might* have changed — a new turn starts". The two are
+operationally identical (one API call), but reconciling is
+guaranteed to terminate (one call per turn, period), while
+polling has no upper bound.
+
+The deeper fix is **layer 1** in §0 (repo-level
+`Allow auto-merge`). Reconciling is the defence-in-depth that
+keeps things moving until layer 1 is on.
+
 ## 2. Mechanics — GitHub MCP
 
 The MCP tools used here:

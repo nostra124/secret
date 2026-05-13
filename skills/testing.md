@@ -164,6 +164,12 @@ to events. Polling `get_check_runs` in a loop, sleeping until CI
 finishes, or any other busy-wait pattern is forbidden — it hangs
 the session and produces no work.
 
+Webhook delivery is best-effort. To handle dropped events, the
+agent also reconciles state at the start of every wake — one
+`get_check_runs` call per subscribed PR per turn. See
+`skills/automerging.md` §2c. CI failures (and successes) that
+miss the webhook still surface on the next turn.
+
 Failure messages are **trimmed to 200 lines** to stay safely under
 GitHub's 65 535-character comment limit; the full log is available
 as the `bats-unit-log` artefact.
