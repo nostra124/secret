@@ -2,7 +2,8 @@
 id: FEAT-205
 type: feature
 priority: medium
-status: open
+status: resolved
+resolved-in: 0.11.0
 ---
 
 # Add tests for the `store/param` dispatcher shortcut, `destroy password-store`, and flag parsing

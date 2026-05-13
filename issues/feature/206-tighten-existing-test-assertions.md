@@ -2,7 +2,8 @@
 id: FEAT-206
 type: feature
 priority: low
-status: open
+status: resolved
+resolved-in: 0.11.0
 ---
 
 # Tighten loose assertions in existing unit tests

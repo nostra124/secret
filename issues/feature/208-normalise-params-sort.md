@@ -2,7 +2,8 @@
 id: FEAT-208
 type: feature
 priority: low
-status: open
+status: resolved
+resolved-in: 0.11.0
 ---
 
 # Normalise `sort -u` behaviour in `command:params` between password-store and regular stores

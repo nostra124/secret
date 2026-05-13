@@ -2,7 +2,9 @@
 id: FEAT-209
 type: feature
 priority: low
-status: open
+status: resolved
+resolved-in: 0.11.0
+decision: Option C (grep -i) — `command:ls` matches the query prefix case-insensitively. Deeper case-handling in `command:params` / `command:exists` etc. remains out of scope; the contract relies on `command:init` normalising store directory names to lowercase at creation time.
 ---
 
 # Normalise case handling between `stores` listing and `ls` prefix filtering
