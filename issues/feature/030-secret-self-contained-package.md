@@ -2,7 +2,9 @@
 id: FEAT-030
 type: feature
 priority: high
-status: open
+status: resolved
+resolved-in: 0.13.0
+resolved-by: FEAT-215 (docs/secret.md). The last open criterion at the 2026-05-13 audit was the docs/secret.md gap; FEAT-215 closed it. Criterion #6 (docs/templates/CLAUDE.md.secret) is satisfied by CLAUDE.md at the repo root — see audit-2026-05-13.md.
 ---
 
 # Secret self-contained packaging: docs, tests, man page, completion, CLAUDE.md
