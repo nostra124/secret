@@ -185,6 +185,87 @@ teardown() {
 	rm -rf "$SPACED"
 }
 
+# FEAT-213: the deep quoting refactor in 0.12.0 makes every
+# subcommand survive a $SELF_CONFIG path containing spaces. Each
+# test re-points XDG_SECRET_STORES at a spaced sandbox and exercises
+# one subcommand.
+
+setup_spaced() {
+	SPACED_CONFIG="$BATS_TMPDIR/spaced cfg.$$"
+	mkdir -p "$SPACED_CONFIG"
+}
+
+teardown_spaced() {
+	rm -rf "$SPACED_CONFIG"
+}
+
+@test "exists works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" exists mystore
+	[ "$status" -eq 0 ]
+	teardown_spaced
+}
+
+@test "params works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	touch "$SPACED_CONFIG/mystore/key.gpg"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" params mystore
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"key"* ]]
+	teardown_spaced
+}
+
+@test "has works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	touch "$SPACED_CONFIG/mystore/key.gpg"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" has mystore/key
+	[ "$status" -eq 0 ]
+	teardown_spaced
+}
+
+@test "ls works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	touch "$SPACED_CONFIG/mystore/key.gpg"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" ls
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"mystore/key"* ]]
+	teardown_spaced
+}
+
+@test "destroy works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	touch "$SPACED_CONFIG/mystore/key.gpg"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" destroy mystore
+	[ "$status" -eq 0 ]
+	[ ! -d "$SPACED_CONFIG/mystore" ]
+	teardown_spaced
+}
+
+@test "clean works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	touch "$SPACED_CONFIG/mystore/empty.gpg"
+	echo "x" > "$SPACED_CONFIG/mystore/keep.gpg"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" clean mystore
+	[ "$status" -eq 0 ]
+	[ ! -e "$SPACED_CONFIG/mystore/empty.gpg" ]
+	[ -e "$SPACED_CONFIG/mystore/keep.gpg" ]
+	teardown_spaced
+}
+
+@test "remotes works under a spaced SELF_CONFIG (FEAT-213)" {
+	setup_spaced
+	mkdir -p "$SPACED_CONFIG/mystore"
+	XDG_SECRET_STORES="$SPACED_CONFIG" run "$SECRET_BIN" remotes
+	[ "$status" -eq 0 ]
+	teardown_spaced
+}
+
 # ---------------------------------------------------------------------------
 # exists
 # ---------------------------------------------------------------------------

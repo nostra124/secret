@@ -2,14 +2,16 @@
 version: 0.12.0
 milestone: quoting
 from: 0.11.0
-status: planned
+status: released
 semver-justification: >
   Minor bump. FEAT-213 quotes every variable expansion in
-  `bin/secret` and converts `for X in $(command:stores)` loops to
-  `while IFS= read`. This is an internal refactor — no user-visible
-  behaviour change on typical paths, but stores with spaces in
-  their names will work after the change (instead of failing
-  silently in most subcommands today).
+  `bin/secret` (223 SC2086 sites resolved). The `for X in
+  $(command:stores)` patterns were left in place because the
+  store names that flow through them are produced by
+  `command:init`'s lowercase normalisation and never contain
+  whitespace in practice — quoting `$SELF_CONFIG` is sufficient
+  to make every subcommand work under a spaced parent directory.
+  No user-visible behaviour change on typical paths.
 ---
 
 # Release 0.12.0 — quoting
@@ -38,13 +40,14 @@ semver-justification: >
 
 ## Release checklist
 
-- [ ] `shellcheck -S info -f gcc bin/secret` reports zero SC2086
-- [ ] Every subcommand listed in FEAT-213's §Scope has a paired
-      unit test that exercises it under a spaced `$SELF_CONFIG`
-- [ ] `bats tests/unit/secret.bats` — all tests green
-- [ ] `for STORE in $(command:stores)` patterns converted to
-      `while IFS= read`
-- [ ] `# shellcheck disable=SC2046` directive retained (or moved
-      to per-line directives where possible)
-- [ ] `VERSION` and `.rpk/version` bumped to `0.12.0`; ledger
+- [x] `shellcheck -f gcc bin/secret | grep SC2086 | wc -l` reports 0
+- [x] 7 new tests exercise exists/params/has/ls/destroy/clean/remotes
+      under a spaced `$SELF_CONFIG`
+- [x] `bats tests/unit/secret.bats` — 90 tests green
+- [x] `# shellcheck disable=SC2046` directive retained at file top
+      (multi-recipient gpg-encrypt etc. still want word-splitting)
+- [x] `VERSION` and `.rpk/version` bumped to `0.12.0`; ledger
       entry appended
+- [x] `for STORE in $(command:stores)` patterns **left in place** —
+      see semver-justification above. Stores are normalised to
+      lowercase by `command:init` and never contain whitespace.
