@@ -1,6 +1,7 @@
 ---
 name: milestones
-description: |
+description: Plan, run, and retire a secret milestone
+long_description: |
   Plan, run, and retire a `secret` milestone. Trigger when a
   release is being scoped (new `ROADMAP-<x.y.z>.md`), when a
   feature is being shuffled between milestone backlogs, when a

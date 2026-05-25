@@ -1,6 +1,7 @@
 ---
 name: automerging
-description: |
+description: Auto-merge a PR for secret once CI is green
+long_description: |
   Auto-merge a PR for `secret` once CI is green. Trigger when a PR
   has been opened, the changes are reviewed (or trivial), and the
   reviewer/owner wants the merge to fire automatically the moment

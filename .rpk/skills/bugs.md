@@ -1,6 +1,7 @@
 ---
 name: bugs
-description: |
+description: File and fix a bug in secret
+long_description: |
   File and fix a bug in `secret`. Trigger when CI fails, a reviewer
   reports incorrect behaviour, or you discover a defect while
   working on something else. Covers the issue file format

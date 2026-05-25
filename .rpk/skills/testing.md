@@ -1,6 +1,7 @@
 ---
 name: testing
-description: |
+description: Run, extend, and debug the secret test suites
+long_description: |
   Run, extend, and debug the `secret` test suites. Trigger when the
   user asks how to run tests, why CI failed, where SIT lives, how
   pre-push works, or how to add a new test tier. Covers the three

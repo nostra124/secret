@@ -1,6 +1,7 @@
 ---
 name: logging
-description: |
+description: Pick the right log level for secret code
+long_description: |
   Emit logs at the right level in `bin/secret` (and any sibling
   script in the rpk family). Trigger when adding a new code path
   that prints to stderr, deciding between warn / error / fatal,

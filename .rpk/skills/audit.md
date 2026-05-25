@@ -1,6 +1,7 @@
 ---
 name: audit
-description: |
+description: Run a traceability audit of secret
+long_description: |
   Run a traceability audit of `secret`. Trigger periodically
   (every milestone, at minimum), when behaviour seems undocumented,
   or when the user asks "is every subcommand covered by an issue"

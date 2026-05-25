@@ -1,6 +1,7 @@
 ---
 name: version
-description: |
+description: Update the package version of secret
+long_description: |
   Update the package version of `secret`. Trigger when a sprint/
   milestone is closing, a release tag is about to be cut, or a
   contributor asks "how do I bump the version" / "where is the

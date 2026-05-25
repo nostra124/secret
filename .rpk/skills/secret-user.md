@@ -1,6 +1,7 @@
 ---
 name: secret-user
-description: |
+description: Operate the secret multi-store secret manager
+long_description: |
   Operate the `secret` multi-store secret manager — put,
   get, list, sync GPG-encrypted-at-rest secrets across
   account-registered peers, including the special

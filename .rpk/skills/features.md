@@ -1,14 +1,7 @@
 ---
 name: features
-description: |
-  Author a feature for `secret`. Trigger when proposing a new
-  capability, sub-command, or enhancement that does not fit the
-  bug category. Covers the FEAT-NNN frontmatter, the user-story
-  body, acceptance-criteria conventions, and how features land on
-  a roadmap. Bugs go through `skills/bugs.md` instead — features
-  and bugs share the FEAT-NNN pool but use different priority
-  rules and a different workflow.
----
+description: Author a feature for secret
+long_description: |
 
 # `features` skill — author a feature issue
 
