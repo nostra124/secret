@@ -29,9 +29,9 @@ specialised:
 - **Decentralized.** No central secret server; each
   account holds its own stores. Sync is symmetric
   pull/push between peers.
-- **Simple.** `secret` calls only `account` at
-  runtime. SSH endpoints come from
-  `account remote-url`.
+- **Simple.** `secret` is self-contained — reads
+  `~/.config/account/` config files for interoperability
+  but does not require `account(1)` at runtime.
 
 ## 2. The model
 
@@ -46,8 +46,8 @@ repository with one GPG-encrypted file per parameter:
       <sub>/<param>.gpg    # nested
 
 A **parameter** is identified by `<store>/<sub>/<param>`.
-Reading takes `account gpg-decrypt`; writing takes
-`account gpg-encrypt $(secret recipients <store>)`.
+Reading takes GPG decryption directly; writing takes GPG
+encryption for the recipients in `<store>/.gpg/*.pub`.
 
 The special **password-store** maps onto `pass(1)`:
 `secret pass-init` bootstraps it (FEAT-041);
@@ -61,8 +61,7 @@ to `pass`.
        secret pass-init
 
    Verifies `gpg` and `pass` are on PATH, then runs
-   `pass init $(account gpg-fingerprint $(account
-   identity))` and `pass git init`.
+   `pass init $(secret identity)` and `pass git init`.
 
 2. **Create a regular store.**
 
@@ -91,8 +90,7 @@ to `pass`.
        secret push bitcoin alice@example.com
        secret pull bitcoin alice@example.com
 
-   SSH endpoints come from
-   `account remote-url <peer> secret/<store>` (FEAT-044).
+   SSH endpoints are computed as `<peer>:~/.config/secret/<store>`.
 
 8. **Render as QR for offline transfer.**
 
