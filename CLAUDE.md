@@ -13,13 +13,15 @@
   store) under `$XDG_CONFIG_HOME/secret/<store>/`
 - the `pass(1)` password-store integration
   (`pass-init` per FEAT-041)
-- git-backed sync of stores between
-  `account`-registered peers via `account remote-url`
-  (FEAT-044)
+- git-backed sync of stores between peers via SSH
 
-Out of scope: cryptography primitives (that's `crypt`),
-identity/key management (that's `account`), generic
-config file management (that's `config`).
+Out of scope: cryptography primitives separate from GPG,
+generic config file management.
+
+`secret` is self-contained — it can be installed without
+`account(1)`, but uses the same `~/.config/account/` config
+directory layout for GPG public keys when `account(1)` is
+installed.
 
 ## 2. Repo conventions
 
@@ -71,20 +73,28 @@ auto-merge through the GitHub gate.
 
 ## 4. The no-shared-lib policy
 
-`secret` calls only `account` at runtime. Every other
-utility logic — store-path computation, conflict
-resolution, parameter encoding — is inlined.
+`secret` is self-contained. It reads `~/.config/account/` config files
+directly (GPG public keys, SSH public keys) for interoperability with
+`account(1)`, but does not require it at runtime. All utility logic —
+identity computation, GPG key management, account list enumeration —
+is inlined.
 
 The temptation to "DRY it up" by reaching for `crypt` /
-`config` / `data` / `user` is **wrong**. `crypt` is a
-crypto-primitives sibling, not a library. `config` is a
-sibling tool, not a config-reader.
+`config` / `data` / `user` / `account` is **wrong**. These are
+sibling tools, not libraries. `secret` operates standalone.
 
 ## 5. What is intentionally duplicated
 
-- **GPG encrypt / decrypt invocation.** Direct calls to
-  `gpg(1)` (via `account gpg-encrypt` / `account
-  gpg-decrypt`); never delegated to `crypt`.
+- **Identity computation.** `$(whoami)@$(hostname -f)` — same format
+  as `account identity`, computed directly without calling `account`.
+- **GPG key management.** `gpg_export_public_key`, `gpg_import_public_key`,
+  `gpg_fingerprint`, `gpg_encrypt`, `gpg_decrypt` — direct GPG calls,
+  storing exported keys in `~/.config/account/gpg/<identity>.pub` for
+  interoperability with `account(1)`.
+- **Account list.** Reads `~/.config/account/ssh/` directory listing,
+  removing `.pub` suffix — same data source as `account list`.
+- **GPG encrypt / decrypt invocation.** Direct calls to `gpg(1)`;
+  never delegated to `crypt` or `account`.
 - **Store-path computation** (`$XDG_CONFIG_HOME/secret/`
   fallback to `/etc/secret/` when root). Same shape as
   `config`'s store-path logic, intentionally duplicated.

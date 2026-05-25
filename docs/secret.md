@@ -15,8 +15,10 @@ secret [options] <subcommand> [args...]
 
 `secret` manages secrets in multiple **stores**. Each parameter is
 GPG-encrypted at rest. Each store is a git repository, so changes
-can be pulled, pushed, and synchronised between
-`account(1)`-registered peers.
+can be pulled, pushed, and synchronised between peers over SSH.
+
+The special store **`password-store`** is mapped onto `pass(1)`
+(see `pass-init` below).
 
 The special store **`password-store`** is mapped onto `pass(1)`
 (see `pass-init` below).
@@ -46,8 +48,8 @@ Print the package version. Resolved by reading `VERSION`,
 
 #### `identity`
 
-Print the main GPG identity (`account identity`). Exits non-zero if
-no identity has been set up yet.
+Print the main GPG identity. Computed as `$(whoami)@$(hostname -f)`.
+Exits non-zero if no identity has been set up yet.
 
 ```
 secret identity
@@ -55,9 +57,10 @@ secret identity
 
 #### `setup`
 
-One-shot central setup: delegates to `account init` for GPG identity
-(key check, backup restore, key generation), git config, SSH keys,
-and agent configuration, then ensures the secret store root exists.
+One-shot central setup: ensure a GPG identity exists (generating
+one if needed), export the public key to `~/.config/account/gpg/`
+for interoperability with `account(1)`, and create the secret
+store root directory.
 
 ```
 secret setup
@@ -98,13 +101,12 @@ secret params bitcoin
 #### `init [store]`
 
 When called without a store, ensure a GPG identity exists
-(delegating to `account init` for key restoration or generation)
-then re-initialise every existing store.
+(generating one if needed), then re-initialise every existing store.
 
 When called with a store, initialise `store` as a new git
 repository under `$SELF_CONFIG`. For `password-store`, delegates
 to `pass init`. For other stores, sets up `.gpg/recipients` with
-the current account's identity and re-encrypts any pre-existing
+the current identity and re-encrypts any pre-existing
 parameters.
 
 ```
@@ -241,17 +243,17 @@ sorted and deduplicated.
 
 #### `pull [store] [account]`
 
-Pull `store` from `account` over SSH. The remote URL is resolved
-via `account remote-url "$ACCOUNT" "secret/<store>"` (FEAT-044).
-Merge conflicts are auto-resolved by taking the remote side
+Pull `store` from `account` over SSH. The remote URL is constructed
+as `account:~/.config/secret/<store>` (or `account:~/.password-store`
+for password-store). Merge conflicts are auto-resolved by taking the remote side
 (`git checkout --theirs`).
 
 - No args: pull every store from every account.
 - `store` only: pull `store` from every account.
 - `store account`: pull `store` from `account`.
 
-If `account` is unreachable (`account online` returns non-zero),
-emit a warning and exit 0.
+If `account` is unreachable (SSH connection fails or `account`
+doesn't have the peer registered), emit a warning and exit 0.
 
 ```
 secret pull bitcoin alice
@@ -278,8 +280,10 @@ Pull every store from `account`, then push every store to
 
 #### `add-gpg-key <store> <account>`
 
-Add `account`'s public key to `store`'s `.gpg/recipients` and
-re-encrypt every parameter to include the new recipient.
+Add `account`'s public key (read from `~/.config/account/gpg/<account>.pub`)
+to `store`'s `.gpg/recipients` and re-encrypt every parameter to include
+the new recipient. Uses the `secret identity` format as the basis for
+account names.
 
 #### `del-gpg-key <store> <account>`
 
@@ -330,14 +334,16 @@ See `skills/logging.md` for the four log levels (`debug`, `info`,
 
 ## Cross-script dependencies
 
-`secret` calls only one sibling script at runtime:
+`secret` is self-contained and does not require `account(1)` to be
+installed. It reads account configuration directly from
+`~/.config/account/` for interoperability:
 
-- **`account(1)`** — identity, GPG key management, SSH endpoint
-  resolution (`account gpg-encrypt`, `account gpg-decrypt`,
-  `account gpg-fingerprint`, `account identity`,
-  `account gpg-export-public-key`, `account gpg-import-public-key`,
-  `account has-gpg-key`, `account list`, `account online`,
-  `account remote-url`).
+- **GPG public keys** — stored in `~/.config/account/gpg/<identity>.pub`
+- **Remote account list** — `~/.config/account/ssh/` directory listing
+- **Identity format** — computed directly as `$(whoami)@$(hostname -f)`
+
+When `account(1)` is installed later, it finds all keys in the
+expected locations.
 
 Plus standard CLI tools:
 
