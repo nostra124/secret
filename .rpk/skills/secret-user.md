@@ -1,135 +1,116 @@
 ---
 name: secret-user
 description: Operate the secret multi-store secret manager
-long_description: |
-  Operate the `secret` multi-store secret manager — put,
-  get, list, sync GPG-encrypted-at-rest secrets across
-  account-registered peers, including the special
-  `password-store` (pass(1)) integration. Trigger when
-  the user wants to store an API token, generate a
-  random secret, sync secrets between machines, or learn
-  the GPG-at-rest + git-backed-sync model.
+long_description: Manage GPG-encrypted-at-rest secrets across multiple stores with git-backed sync between peers. Use when storing API tokens, generating random secrets, syncing secrets between machines, or managing password-store integration.
+role: [user]
 ---
 
-# `secret-user` skill
+# secret-user
 
-## 1. Design principles
+Manage secrets in multiple **stores**. Each parameter is GPG-encrypted
+at rest. Each store is a git repository for syncing between peers.
 
-`secret` follows the four collection principles —
-**educational, functional, decentralized, simple** —
-specialised:
+## When to use
 
-- **Educational.** Every parameter is just a
-  GPG-encrypted file in a git directory. Reading
-  `bin/secret` end-to-end teaches the GPG-at-rest +
-  git-sync model.
-- **Functional.** Each verb is a pure transformation
-  over the filesystem: read a file, decrypt, print;
-  read stdin, encrypt, write. Sync is git pull/push.
-- **Decentralized.** No central secret server; each
-  account holds its own stores. Sync is symmetric
-  pull/push between peers.
-- **Simple.** `secret` is self-contained — reads
-  `~/.config/account/` config files for interoperability
-  but does not require `account(1)` at runtime.
+- "Store an API token" or "Set a secret"
+- "Get a secret" or "Read an encrypted value"
+- "Generate a random password"
+- "Sync secrets between machines"
+- "Add a recipient to a store"
+- "Bootstrap password-store"
+- "List secrets in a store"
 
-## 2. The model
+## The model
 
-A **store** is a directory at
-`$XDG_CONFIG_HOME/secret/<store>/`. It's a git
-repository with one GPG-encrypted file per parameter:
+A **store** is a git repository at `$XDG_CONFIG_HOME/secret/<store>/`:
 
-    secret/<store>/
-      .gpg/recipients      # who can decrypt
-      .gpg/<account>.pub   # each recipient's public key
-      <param>.gpg          # GPG-encrypted parameter
-      <sub>/<param>.gpg    # nested
+```
+secret/<store>/
+  .gpg/recipients      # who can decrypt
+  .gpg/<account>.pub   # each recipient's public key
+  <param>.gpg          # GPG-encrypted parameter
+  <sub>/<param>.gpg    # nested parameters
+```
 
 A **parameter** is identified by `<store>/<sub>/<param>`.
-Reading takes GPG decryption directly; writing takes GPG
-encryption for the recipients in `<store>/.gpg/*.pub`.
 
-The special **password-store** maps onto `pass(1)`:
-`secret pass-init` bootstraps it (FEAT-041);
-`secret get password-store/<name>` and friends delegate
-to `pass`.
+The special **password-store** maps onto `pass(1)`.
 
-## 3. Workflow recipes
+## Workflow
 
-1. **Bootstrap the pass(1) password-store.**
+### 1. Bootstrap
 
-       secret pass-init
+```bash
+# Setup GPG identity (if needed)
+secret setup
 
-   Verifies `gpg` and `pass` are on PATH, then runs
-   `pass init $(secret identity)` and `pass git init`.
+# Bootstrap password-store
+secret pass-init
 
-2. **Create a regular store.**
+# Create a regular store
+secret init bitcoin
+```
 
-       secret init bitcoin
+### 2. Store and retrieve
 
-3. **Encrypt a value.**
+```bash
+# Encrypt a value
+echo "$TOKEN" | secret set bitcoin/api/key
 
-       echo $TOKEN | secret set bitcoin/api/key
+# Read a value
+secret get bitcoin/api/key
 
-4. **Read a value.**
+# Generate a random 33-char password
+secret gen bitcoin/api/token
 
-       secret get bitcoin/api/key
+# List parameters in a store
+secret ls bitcoin
+```
 
-5. **List parameters.**
+### 3. Sync between peers
 
-       secret ls bitcoin
+```bash
+# Sync all stores with peer
+secret sync alice@example.com
 
-6. **Generate a random parameter.**
+# Push/pull specific store
+secret push bitcoin alice@example.com
+secret pull bitcoin alice@example.com
+```
 
-       secret gen bitcoin/api/token > /dev/null
-       secret get bitcoin/api/token
+### 4. Manage recipients
 
-7. **Sync stores between peers.**
+```bash
+# Add a recipient
+secret add-gpg-key bitcoin bob@example.com
 
-       secret sync alice@example.com
-       secret push bitcoin alice@example.com
-       secret pull bitcoin alice@example.com
+# List recipients
+secret gpg-keys bitcoin
+```
 
-   SSH endpoints are computed as `<peer>:~/.config/secret/<store>`.
+### 5. QR code
 
-8. **Render as QR for offline transfer.**
+```bash
+secret qr bitcoin/api/key
+```
 
-       secret qr bitcoin/api/key
+## Guardrails
 
-9. **Add a recipient to a store.**
+1. **Never log secret values.** `secret get` writes to stdout — pipe carefully.
+2. **Don't store secrets in `config`.** `config` is plaintext; `secret` is for credentials.
+3. **`secret destroy <store>` is permanent.** It `rm -rf`'s the git repo.
+4. **Pulling from a peer?** Run `secret init <store>` after pull to re-encrypt for new recipients.
+5. **`-f` (force) on push/pull** bypasses conflict safety. Use only when you know which side wins.
 
-   Add the new account's public key under
-   `<store>/.gpg/<account>.pub`, then
-   `secret init <store>` to re-encrypt every parameter
-   with the updated recipient set.
+## Files
 
-## 4. Guardrails
+| Path | Purpose |
+|------|---------|
+| `$XDG_CONFIG_HOME/secret/<store>/` | Store directory (git-tracked) |
+| `~/.password-store/` | pass(1) password-store |
+| `~/.config/account/gpg/<identity>.pub` | GPG public keys for interoperability |
 
-1. **Never log a secret value.** `secret get` writes to
-   stdout — pipe carefully. `set -x` shell tracing
-   captures pipelines verbatim. `secret -d` enables
-   tracing; only use it on an isolated machine.
-2. **Don't store secrets in `config`** — it's
-   plaintext. `config` is for non-sensitive
-   configuration; `secret` is for credentials.
-3. **`secret destroy <store>` is permanent.** It
-   `rm -rf`'s the git repo. Take a backup if
-   uncertain.
-4. **Pulling adds a recipient: re-encrypt.** When you
-   sync from a peer that has additional recipients in
-   its `<store>/.gpg/recipients`, `secret init <store>`
-   afterward to re-encrypt every parameter for the
-   updated recipient set.
-5. **`-f` (force) on push/pull bypasses safety.** Use
-   only when you've inspected the conflict and know
-   which side wins.
+## See also
 
-## 5. Where to read more
-
-- `man secret` — full reference (synopsis, every
-  subcommand, env, files, examples).
-- `man pass` — the password-store(1) tool that backs
-  `password-store/`.
-- This package's `CLAUDE.md` — developer-side
-  conventions, the no-shared-lib policy, intentional
-  duplications.
+- `man secret` — full command reference
+- `man pass` — password-store(1) documentation
