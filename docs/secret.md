@@ -44,6 +44,25 @@ Print the package version. Resolved by reading `VERSION`,
 `.rpk/version`, then `share/secret/version` (see
 `skills/version.md` §1).
 
+#### `identity`
+
+Print the main GPG identity (`account identity`). Exits non-zero if
+no identity has been set up yet.
+
+```
+secret identity
+```
+
+#### `setup`
+
+One-shot central setup: delegates to `account init` for GPG identity
+(key check, backup restore, key generation), git config, SSH keys,
+and agent configuration, then ensures the secret store root exists.
+
+```
+secret setup
+```
+
 #### `skills [name]`
 
 List available skill files under `skills/`. With a `name` argument,
