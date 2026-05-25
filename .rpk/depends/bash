@@ -1,0 +1,33 @@
+#!/bin/sh
+# Install dependency: bash (system tool).
+set -eu
+
+command -v bash >/dev/null 2>&1 && exit 0
+
+case "$(uname -s)" in
+	Darwin)
+		command -v brew >/dev/null 2>&1 || {
+			echo "depends/bash: brew not found" >&2
+			exit 1
+		}
+		exec brew install bash
+		;;
+	Linux)
+		if command -v apt-get >/dev/null 2>&1; then
+			exec sudo apt-get install -y bash
+		elif command -v dnf >/dev/null 2>&1; then
+			exec sudo dnf install -y bash
+		elif command -v pacman >/dev/null 2>&1; then
+			exec sudo pacman -S --noconfirm bash
+		elif command -v apk >/dev/null 2>&1; then
+			exec sudo apk add bash
+		else
+			echo "depends/bash: no supported package manager" >&2
+			exit 1
+		fi
+		;;
+	*)
+		echo "depends/bash: unsupported platform: $(uname -s)" >&2
+		exit 1
+		;;
+esac

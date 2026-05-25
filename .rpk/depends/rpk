@@ -1,0 +1,12 @@
+#!/bin/sh
+# Verify dependency: rpk.
+set -eu
+
+RPK="$HOME/.local/bin/rpk"
+
+[ -x "$RPK" ] || {
+	echo "depends/rpk: $RPK not found or not executable" >&2
+	exit 1
+}
+
+exit 0

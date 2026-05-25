@@ -1,0 +1,33 @@
+#!/bin/sh
+# Install dependency: gpg (system tool).
+set -eu
+
+command -v gpg >/dev/null 2>&1 && exit 0
+
+case "$(uname -s)" in
+	Darwin)
+		command -v brew >/dev/null 2>&1 || {
+			echo "depends/gpg: brew not found" >&2
+			exit 1
+		}
+		exec brew install gnupg
+		;;
+	Linux)
+		if command -v apt-get >/dev/null 2>&1; then
+			exec sudo apt-get install -y gnupg
+		elif command -v dnf >/dev/null 2>&1; then
+			exec sudo dnf install -y gnupg2
+		elif command -v pacman >/dev/null 2>&1; then
+			exec sudo pacman -S --noconfirm gnupg
+		elif command -v apk >/dev/null 2>&1; then
+			exec sudo apk add gnupg
+		else
+			echo "depends/gpg: no supported package manager" >&2
+			exit 1
+		fi
+		;;
+	*)
+		echo "depends/gpg: unsupported platform: $(uname -s)" >&2
+		exit 1
+		;;
+esac

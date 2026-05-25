@@ -1,0 +1,33 @@
+#!/bin/sh
+# Install dependency: stow (system tool).
+set -eu
+
+command -v stow >/dev/null 2>&1 && exit 0
+
+case "$(uname -s)" in
+	Darwin)
+		command -v brew >/dev/null 2>&1 || {
+			echo "depends/stow: brew not found" >&2
+			exit 1
+		}
+		exec brew install stow
+		;;
+	Linux)
+		if command -v apt-get >/dev/null 2>&1; then
+			exec sudo apt-get install -y stow
+		elif command -v dnf >/dev/null 2>&1; then
+			exec sudo dnf install -y stow
+		elif command -v pacman >/dev/null 2>&1; then
+			exec sudo pacman -S --noconfirm stow
+		elif command -v apk >/dev/null 2>&1; then
+			exec sudo apk add stow
+		else
+			echo "depends/stow: no supported package manager" >&2
+			exit 1
+		fi
+		;;
+	*)
+		echo "depends/stow: unsupported platform: $(uname -s)" >&2
+		exit 1
+		;;
+esac

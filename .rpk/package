@@ -1,0 +1,49 @@
+#!/bin/bash
+# rpk package phase: stage a bundle for $1 at
+# $(rpk bundle $(rpk type))/<package>-<version>/ per docs/PACKAGING.md.
+set -eu
+
+die() { echo "$@" >&2; exit 100; }
+
+PACKAGE=$(rpk identity)
+VERSION=${1:-}
+[ -n "$VERSION" ] || VERSION=$(rpk versions | tail -1)
+
+COMMIT=$(rpk commit "$PACKAGE" "$VERSION")
+[ -n "$COMMIT" ] || die "version $VERSION has no commit hash"
+
+TARGET=$(rpk bundle "$(rpk type)")/$PACKAGE-$VERSION
+
+BRANCH=$(git branch --show-current)
+trap 'git checkout "$BRANCH" --force >/dev/null 2>&1 || true' EXIT
+
+git config advice.detachedHead false
+git checkout "$COMMIT" || die "failed to checkout $COMMIT"
+
+mkdir -p \
+	"$TARGET/bin" \
+	"$TARGET/libexec/$PACKAGE" \
+	"$TARGET/etc/bash_completion.d" \
+	"$TARGET/etc/hooks" \
+	"$TARGET/share/man/man1" \
+	"$TARGET/share/$PACKAGE"
+
+cp -a bin/. "$TARGET/bin/"
+
+if [ -d "libexec/$PACKAGE" ]; then
+	cp -a "libexec/$PACKAGE/." "$TARGET/libexec/$PACKAGE/"
+fi
+if [ -d etc/bash_completion.d ]; then
+	cp -a etc/bash_completion.d/. "$TARGET/etc/bash_completion.d/"
+fi
+if [ -d etc/hooks ]; then
+	cp -a etc/hooks/. "$TARGET/etc/hooks/"
+fi
+if [ -d share/man/man1 ]; then
+	cp -a share/man/man1/. "$TARGET/share/man/man1/"
+fi
+if [ -f .rpk/version ]; then
+	install -m 644 .rpk/version "$TARGET/share/$PACKAGE/version"
+fi
+
+git checkout "$BRANCH" --force
