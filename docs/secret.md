@@ -44,6 +44,17 @@ Print the package version. Resolved by reading `VERSION`,
 `.rpk/version`, then `share/secret/version` (see
 `skills/version.md` §1).
 
+#### `skills [name]`
+
+List available skill files under `skills/`. With a `name` argument,
+print the full text of that skill. Primarily used by coding agents
+to load domain knowledge at runtime.
+
+```
+secret skills
+secret skills secret-user
+```
+
 ### Store management
 
 #### `stores`
@@ -65,15 +76,21 @@ input form).
 secret params bitcoin
 ```
 
-#### `init <store>`
+#### `init [store]`
 
-Initialise `store` as a new git repository under `$SELF_CONFIG`.
-For `password-store`, delegates to `pass init`. For other stores,
-sets up `.gpg/recipients` with the current account's identity and
-re-encrypts any pre-existing parameters.
+When called without a store, ensure a GPG identity exists
+(delegating to `account init` for key restoration or generation)
+then re-initialise every existing store.
+
+When called with a store, initialise `store` as a new git
+repository under `$SELF_CONFIG`. For `password-store`, delegates
+to `pass init`. For other stores, sets up `.gpg/recipients` with
+the current account's identity and re-encrypts any pre-existing
+parameters.
 
 ```
-secret init bitcoin
+secret init                    # bootstrap GPG + re-init all stores
+secret init bitcoin             # create or re-initialise a specific store
 ```
 
 #### `pass-init`
@@ -340,7 +357,7 @@ secret add-gpg-key bitcoin bob@example.com
 - `share/man/man1/secret.1` — groff man page (mirror of this
   document).
 - `CLAUDE.md` — agent guide and project conventions.
-- `skills/secret-user/SKILL.md` — agent skill describing typical
+- `skills/secret-user.md` — agent skill describing typical
   workflows.
 - `skills/version.md`, `skills/testing.md`, `skills/logging.md` —
   the development-process skills.

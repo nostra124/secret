@@ -145,6 +145,50 @@ teardown() {
 	[[ "$output" == *"synchronisation commands"* ]]
 }
 
+@test "help lists skills in generic commands" {
+	run "$SECRET_BIN" help
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"skills"* ]]
+}
+
+@test "help init prints init-specific help" {
+	run "$SECRET_BIN" help init
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"init [store]"* ]]
+	[[ "$output" == *"GPG identity"* ]]
+}
+
+@test "help init with unknown flag fatals" {
+	run "$SECRET_BIN" help init --xyz
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"fatal"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# skills — list and read skill definitions
+# ---------------------------------------------------------------------------
+
+@test "skills lists available skills" {
+	run "$SECRET_BIN" skills
+	[ "$status" -eq 0 ]
+	[ -n "$output" ]
+	[[ "$output" == *"secret-user"* ]]
+}
+
+@test "skills <name> prints the skill file content" {
+	run "$SECRET_BIN" skills secret-user
+	[ "$status" -eq 0 ]
+	[ -n "$output" ]
+	[[ "$output" == *"secret-user"* ]]
+}
+
+@test "skills <unknown> exits non-zero with fatal" {
+	run "$SECRET_BIN" skills definitely-not-a-real-skill
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"fatal"* ]]
+	[[ "$output" == *"unknown skill"* ]]
+}
+
 # ---------------------------------------------------------------------------
 # Stores
 # ---------------------------------------------------------------------------

@@ -77,7 +77,7 @@ Installation per the established pattern.
 
 ## Acceptance Criteria
 
-1. `skills/secret-user/SKILL.md` and `opencode.md` exist.
+1. `skills/secret-user.md` and `opencode.md` exist.
 2. `make install` + `make install-skills-user` work.
 3. Guardrail "never log a secret value" called out as #1.
 4. The GPG key-rotation gotcha is documented.

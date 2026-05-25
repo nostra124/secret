@@ -27,7 +27,7 @@ Or in two steps:
 | `docs/secret.md` | CLI contract reference |
 | `share/man/man1/secret.1` | man page |
 | `share/doc/secret/standards/` | vendored references (educational) |
-| `skills/secret-user/` | agent skill |
+| `skills/secret-user.md` | agent skill |
 | `tests/unit/secret.bats` | unit tests |
 | `tests/sit/` | system integration (when present) |
 | `.cpk/` | container packaging overlay |
@@ -39,7 +39,7 @@ Or in two steps:
 - `docs/secret.md` — CLI contract reference
 - `share/doc/secret/standards/README.md` — vendored standards
 - `CLAUDE.md` — agent guide
-- `skills/secret-user/SKILL.md` — agent skill
+- `skills/secret-user.md` — agent skill
 
 ## Conventions
 
