@@ -1,0 +1,507 @@
+/*
+ * param.c — store-parameter commands:
+ *   set, get, del, qr, gen, def, ins, rem, edit
+ * plus the shared parse_param() helper that turns a raw
+ * "<store>/<param>" (or "<store>/<a>:<b>") argument into its components.
+ */
+#define _XOPEN_SOURCE 700
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "internal.h"
+
+/* ---- argument parsing ---------------------------------------------- */
+
+int parse_param(secstore_t *s, const char *raw, int require_slash,
+                char **store, char **param)
+{
+	if (!raw || !*raw)
+		secstore_fatal(s, "please specify a parameter");
+
+	char *work = secstore_lower(raw);
+	str_translate(work, ':', '/');          /* host:name -> host/name */
+	secstore_validate_name(s, "parameter", work);
+
+	if (strchr(raw, '/') == NULL) {
+		free(work);
+		if (require_slash)
+			secstore_fatal(s, "please specify in the format <store>/<param>");
+		return -1;                          /* soft: no separator      */
+	}
+
+	char *slash = strchr(work, '/');
+	*store = xstrdup(work);
+	(*store)[slash - work] = '\0';
+	*param = xstrdup(slash + 1);
+	free(work);
+	return 0;
+}
+
+/* ---- small io helpers ---------------------------------------------- */
+
+static void read_stdin(char **buf, size_t *len)
+{
+	size_t cap = 4096, n = 0;
+	char  *b = xmalloc(cap);
+	ssize_t r;
+	while ((r = read(STDIN_FILENO, b + n, cap - n)) > 0) {
+		n += (size_t)r;
+		if (n == cap) { cap *= 2; b = xrealloc(b, cap); }
+	}
+	b[n] = '\0';
+	*buf = b;
+	*len = n;
+}
+
+static void require_gpg_identity(secstore_t *s)
+{
+	char *id = secstore_identity(s);
+	if (!id || !*id)
+		secstore_warn(s, "no GPG identity — run '%s setup' to configure one", s->self);
+	free(id);
+}
+
+/* Apply 0644/0755 to a store subtree when running as root (parity with
+ * the EUID branch of the shell). */
+static void fix_perms(secstore_t *s, const char *dir)
+{
+	if (s->euid != 0)
+		return;
+	char *chmod_d[] = { "chmod", "-R", "u=rwX,go=rX", (char *)dir, NULL };
+	proc_run(chmod_d, NULL, NULL, 0, NULL, NULL, 1);
+}
+
+/* Commit one parameter file inside its store. */
+static void git_commit_param(secstore_t *s, const char *dir,
+                             const char *relfile, const char *msg)
+{
+	(void)s;
+	char *add[]    = { "git", "add", "-f", (char *)relfile, NULL };
+	char *commit[] = { "git", "commit", "-m", (char *)msg, (char *)relfile, NULL };
+	proc_run(add, dir, NULL, 0, NULL, NULL, 1);
+	proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+}
+
+/* ---- core get / set (used by gen / def / qr / ins / rem) ----------- */
+
+/* Decrypt <store>/<param> into *out. Returns 0 on success, -1 if the
+ * parameter file is absent. */
+static int get_value(secstore_t *s, const char *store, const char *param,
+                     char **out, size_t *outlen)
+{
+	if (strcmp(store, "password-store") == 0) {
+		char *pass[] = { "pass", (char *)param, NULL };
+		return proc_run(pass, NULL, NULL, 0, out, outlen, 0) == 0 ? 0 : -1;
+	}
+	char *file = xasprintf("%s/%s/%s.gpg", s->self_config, store, param);
+	if (!path_exists(file)) {
+		free(file);
+		return -1;
+	}
+	char  *ct = NULL;
+	size_t ctlen = 0;
+	read_file(file, &ct, &ctlen);
+	free(file);
+	int rc = gpg_decrypt(s, ct, ctlen, out, outlen);
+	free(ct);
+	return rc == 0 ? 0 : -1;
+}
+
+/* Encrypt `value` for `store`'s recipients and commit it. */
+static int set_value(secstore_t *s, const char *store, const char *param,
+                     const char *value, size_t vlen)
+{
+	if (strcmp(store, "password-store") == 0) {
+		char *msg = xasprintf("set %s value %s", s->self, param);
+		char *pass[] = { "pass", "insert", "-m", msg, NULL };
+		int rc = proc_run(pass, NULL, value, vlen, NULL, NULL, 0);
+		free(msg);
+		return rc;
+	}
+
+	char *dir = path_join(s->self_config, store);
+	if (!is_dir(dir)) {
+		free(dir);
+		secstore_fatal(s, "store %s does not exist", store);
+	}
+
+	strlist recips;
+	strlist_init(&recips);
+	store_recipients(s, store, &recips);
+
+	char  *ct = NULL;
+	size_t ctlen = 0;
+	gpg_encrypt(s, recips.items, recips.len, value, vlen, &ct, &ctlen);
+	strlist_free(&recips);
+
+	/* Create any intermediate directories the param path implies. */
+	char *rel = xasprintf("%s.gpg", param);
+	char *file = path_join(dir, rel);
+	char *slash = strrchr(file, '/');
+	if (slash) {
+		*slash = '\0';
+		mkdir_p(file);
+		*slash = '/';
+	}
+	write_file(file, ct, ctlen);
+	free(ct);
+
+	char *msg = xasprintf("set %s value %s", s->self, param);
+	git_commit_param(s, dir, rel, msg);
+	free(msg);
+	fix_perms(s, dir);
+
+	free(file);
+	free(rel);
+	free(dir);
+	return 0;
+}
+
+/* ---- commands ------------------------------------------------------ */
+
+int cmd_set(secstore_t *s, int argc, char **argv)
+{
+	char *store = NULL, *param = NULL;
+	parse_param(s, argc ? argv[0] : NULL, 1, &store, &param);
+	require_gpg_identity(s);
+
+	char  *in = NULL;
+	size_t inlen = 0;
+	read_stdin(&in, &inlen);
+	int rc = set_value(s, store, param, in, inlen);
+
+	free(in);
+	free(store);
+	free(param);
+	return rc;
+}
+
+int cmd_get(secstore_t *s, int argc, char **argv)
+{
+	char *store = NULL, *param = NULL;
+	parse_param(s, argc ? argv[0] : NULL, 1, &store, &param);
+	require_gpg_identity(s);
+
+	int rc;
+	if (strcmp(store, "password-store") == 0) {
+		char *pass[] = { "pass", param, NULL };
+		rc = proc_run_tty(pass, NULL);
+	} else {
+		char *dir = path_join(s->self_config, store);
+		if (!is_dir(dir)) {
+			free(dir);
+			secstore_fatal(s, "store %s does not exist", store);
+		}
+		free(dir);
+		char  *plain = NULL;
+		size_t plen = 0;
+		if (get_value(s, store, param, &plain, &plen) == 0) {
+			if (plen)
+				fwrite(plain, 1, plen, stdout);
+			free(plain);
+			rc = 0;
+		} else {
+			secstore_error(s, "%s parameter %s/%s does not exist",
+			               s->self, store, param);
+			rc = 1;
+		}
+	}
+	free(store);
+	free(param);
+	return rc;
+}
+
+int cmd_del(secstore_t *s, int argc, char **argv)
+{
+	char *store = NULL, *param = NULL;
+	parse_param(s, argc ? argv[0] : NULL, 1, &store, &param);
+
+	if (strcmp(store, "password-store") == 0) {
+		char *pass[] = { "pass", "rm", "-f", param, NULL };
+		int rc = proc_run_tty(pass, NULL);
+		free(store); free(param);
+		return rc;
+	}
+
+	char *dir = path_join(s->self_config, store);
+	if (!is_dir(dir)) {
+		free(dir);
+		secstore_fatal(s, "store %s does not exist", store);
+	}
+	char *rel  = xasprintf("%s.gpg", param);
+	char *file = path_join(dir, rel);
+	if (is_file(file)) {
+		char *rm[] = { "git", "rm", (char *)rel, NULL };
+		proc_run(rm, dir, NULL, 0, NULL, NULL, 1);
+		char *msg = xasprintf("removed %s parameter %s", s->self, param);
+		char *commit[] = { "git", "commit", "-m", msg, (char *)rel, NULL };
+		proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+		free(msg);
+	}
+	free(file); free(rel); free(dir);
+	free(store); free(param);
+	return 0;
+}
+
+int cmd_qr(secstore_t *s, int argc, char **argv)
+{
+	if (argc < 1 || !argv[0] || !*argv[0])
+		secstore_fatal(s, "please specify a parameter");
+	char *store = NULL, *param = NULL;
+	parse_param(s, argv[0], 1, &store, &param);
+
+	int rc = 1;
+	char  *plain = NULL;
+	size_t plen = 0;
+	if (get_value(s, store, param, &plain, &plen) == 0) {
+		char *qr[] = { "qrencode", "-t", "utf8", NULL };
+		rc = proc_run(qr, NULL, plain, plen, NULL, NULL, 0);
+		free(plain);
+	}
+	free(store); free(param);
+	return rc;
+}
+
+int cmd_gen(secstore_t *s, int argc, char **argv)
+{
+	char *store = NULL, *param = NULL;
+	parse_param(s, argc ? argv[0] : NULL, 1, &store, &param);
+
+	char  *plain = NULL;
+	size_t plen = 0;
+	if (get_value(s, store, param, &plain, &plen) == 0) {
+		if (plen) fwrite(plain, 1, plen, stdout);
+		free(plain);
+		free(store); free(param);
+		return 0;
+	}
+
+	/* Ensure the store exists, then generate 33 alnum chars. */
+	char *dir = path_join(s->self_config, store);
+	if (!is_dir(dir))
+		cmd_init(s, 1, (char *[]){ store });
+	free(dir);
+
+	static const char alpha[] =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	char secret[34];
+	FILE *ur = fopen("/dev/urandom", "rb");
+	for (int i = 0; i < 33; i++) {
+		unsigned char c;
+		if (ur && fread(&c, 1, 1, ur) == 1)
+			secret[i] = alpha[c % 62];
+		else
+			secret[i] = alpha[(unsigned)rand() % 62];
+	}
+	secret[33] = '\0';
+	if (ur) fclose(ur);
+
+	set_value(s, store, param, secret, 33);
+
+	char  *out = NULL;
+	size_t olen = 0;
+	if (get_value(s, store, param, &out, &olen) == 0) {
+		if (olen) fwrite(out, 1, olen, stdout);
+		free(out);
+	}
+	free(store); free(param);
+	return 0;
+}
+
+int cmd_def(secstore_t *s, int argc, char **argv)
+{
+	char *store = NULL, *param = NULL;
+	parse_param(s, argc ? argv[0] : NULL, 1, &store, &param);
+
+	char  *plain = NULL;
+	size_t plen = 0;
+	if (get_value(s, store, param, &plain, &plen) != 0) {
+		const char *value = (argc >= 2 && argv[1]) ? argv[1] : "";
+		char *v = xasprintf("%s\n", value);
+		set_value(s, store, param, v, strlen(v));
+		free(v);
+	} else {
+		free(plain);
+	}
+
+	char  *out = NULL;
+	size_t olen = 0;
+	if (get_value(s, store, param, &out, &olen) == 0) {
+		if (olen) fwrite(out, 1, olen, stdout);
+		free(out);
+	}
+	free(store); free(param);
+	return 0;
+}
+
+/* Shared validation for ins/rem: the raw arg must be non-empty and
+ * contain a '/' (FEAT-212 hoisted these guards out of get/set). */
+static void ins_rem_validate(secstore_t *s, const char *raw)
+{
+	if (!raw || !*raw)
+		secstore_fatal(s, "please specify a parameter");
+	if (strchr(raw, '/') == NULL)
+		secstore_fatal(s, "please specify in the format <store>/<param>");
+	char *work = secstore_lower(raw);
+	str_translate(work, ':', '/');
+	secstore_validate_name(s, "parameter", work);
+	free(work);
+}
+
+/* Split text into non-blank lines. */
+static void split_lines(const char *text, strlist *out)
+{
+	char *copy = xstrdup(text);
+	char *save = NULL;
+	for (char *l = strtok_r(copy, "\n", &save); l;
+	     l = strtok_r(NULL, "\n", &save)) {
+		int blank = 1;
+		for (char *p = l; *p; p++)
+			if (*p != ' ' && *p != '\t') { blank = 0; break; }
+		if (!blank)
+			strlist_push_copy(out, l);
+	}
+	free(copy);
+}
+
+int cmd_ins(secstore_t *s, int argc, char **argv)
+{
+	const char *raw = argc ? argv[0] : NULL;
+	ins_rem_validate(s, raw);
+
+	char *store = NULL, *param = NULL;
+	parse_param(s, raw, 1, &store, &param);
+
+	char  *ins = NULL;
+	size_t ilen = 0;
+	read_stdin(&ins, &ilen);
+
+	char  *old = NULL;
+	size_t olen = 0;
+	get_value(s, store, param, &old, &olen);
+
+	strlist lines;
+	strlist_init(&lines);
+	split_lines(ins, &lines);
+	if (old) split_lines(old, &lines);
+	strlist_sort_unique(&lines);
+
+	size_t cap = 1;
+	for (size_t i = 0; i < lines.len; i++)
+		cap += strlen(lines.items[i]) + 1;
+	char *merged = xmalloc(cap);
+	size_t off = 0;
+	for (size_t i = 0; i < lines.len; i++)
+		off += (size_t)sprintf(merged + off, "%s\n", lines.items[i]);
+
+	set_value(s, store, param, merged, off);
+
+	free(merged);
+	strlist_free(&lines);
+	free(old); free(ins);
+	free(store); free(param);
+	return 0;
+}
+
+int cmd_rem(secstore_t *s, int argc, char **argv)
+{
+	const char *raw = argc ? argv[0] : NULL;
+	ins_rem_validate(s, raw);
+
+	char *store = NULL, *param = NULL;
+	parse_param(s, raw, 1, &store, &param);
+
+	char  *rem = NULL;
+	size_t rlen = 0;
+	read_stdin(&rem, &rlen);
+	/* Strip trailing newline of the match pattern. */
+	while (rlen > 0 && (rem[rlen - 1] == '\n' || rem[rlen - 1] == '\r'))
+		rem[--rlen] = '\0';
+
+	char  *old = NULL;
+	size_t olen = 0;
+	get_value(s, store, param, &old, &olen);
+
+	strlist lines;
+	strlist_init(&lines);
+	if (old) {
+		strlist all;
+		strlist_init(&all);
+		split_lines(old, &all);
+		for (size_t i = 0; i < all.len; i++)
+			if (!*rem || strstr(all.items[i], rem) == NULL)
+				strlist_push_copy(&lines, all.items[i]);
+		strlist_free(&all);
+	}
+	strlist_sort_unique(&lines);
+
+	size_t cap = 1;
+	for (size_t i = 0; i < lines.len; i++)
+		cap += strlen(lines.items[i]) + 1;
+	char  *merged = xmalloc(cap);
+	size_t off = 0;
+	for (size_t i = 0; i < lines.len; i++)
+		off += (size_t)sprintf(merged + off, "%s\n", lines.items[i]);
+
+	set_value(s, store, param, merged, off);
+
+	free(merged);
+	strlist_free(&lines);
+	free(old); free(rem);
+	free(store); free(param);
+	return 0;
+}
+
+int cmd_edit(secstore_t *s, int argc, char **argv)
+{
+	char *store = NULL, *param = NULL;
+	parse_param(s, argc ? argv[0] : NULL, 1, &store, &param);
+
+	const char *editor = getenv("EDITOR");
+	if (!editor || !*editor)
+		editor = "vi";
+	require_gpg_identity(s);
+
+	if (strcmp(store, "password-store") == 0) {
+		char *pass[] = { "pass", "edit", param, NULL };
+		int rc = proc_run_tty(pass, NULL);
+		free(store); free(param);
+		return rc;
+	}
+
+	char *dir = path_join(s->self_config, store);
+	if (!is_dir(dir)) {
+		free(dir);
+		secstore_fatal(s, "store %s does not exist", store);
+	}
+
+	char tmpl[] = "/tmp/secret-edit.XXXXXX";
+	int fd = mkstemp(tmpl);
+	if (fd >= 0) close(fd);
+
+	char  *plain = NULL;
+	size_t plen = 0;
+	if (get_value(s, store, param, &plain, &plen) == 0) {
+		write_file(tmpl, plain, plen);
+		free(plain);
+	}
+
+	char *ed[] = { (char *)editor, tmpl, NULL };
+	proc_run_tty(ed, NULL);
+
+	char  *edited = NULL;
+	size_t elen = 0;
+	read_file(tmpl, &edited, &elen);
+	set_value(s, store, param, edited ? edited : "", elen);
+	free(edited);
+
+	char *shred[] = { "shred", "-f", tmpl, NULL };
+	if (proc_run(shred, NULL, NULL, 0, NULL, NULL, 1) != 0)
+		remove(tmpl);
+
+	free(dir);
+	free(store); free(param);
+	return 0;
+}

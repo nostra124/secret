@@ -25,10 +25,29 @@ installed.
 
 ## 2. Repo conventions
 
-Standard rpk per-package conventions: `bin/secret`
-dispatcher with `command:<verb>` functions. No plugins
-in `libexec/secret/` today; if a future plugin lands,
-it follows FEAT-001's libexec lookup pattern.
+`secret` is a C program. The logic lives in `libsecstore`
+(`lib/*.c`, public header `lib/secstore.h`); the CLI
+(`src/secret.c`) is a thin dispatcher that parses the
+global `-d/-q/-f` flags, applies the FEAT-205
+`<store>/<param>` shortcut, and routes to one `cmd_<verb>`
+function per subcommand (the C analogue of the old
+`command:<verb>` shell functions). The single source of
+truth for which verbs exist is the table in
+`lib/dispatch.c`.
+
+`make` compiles the library objects (`-fPIC`), links
+`bin/secret` against them so the binary runs from the
+source tree with no `LD_LIBRARY_PATH`, and also emits
+`libsecstore.so` / `libsecstore.a`. `bin/secret` is a
+build artifact (git-ignored), not a tracked script — the
+unit suite, CI and the pre-push hook all build it first
+(`make -f Makefile.in bin/secret`).
+
+The runtime still shells out to `gpg(1)`, `git(1)`,
+`pass(1)`, `ssh(1)` and `qrencode(1)` — the same external
+tools the original shell version used — so on-disk
+ciphertext and on-wire git formats remain interoperable
+with peers running either implementation.
 
 Logging: four levels (`debug` / `info` / `warn` /
 `error`) plus a `fatal` convenience (= error + exit).
@@ -83,6 +102,16 @@ The temptation to "DRY it up" by reaching for `crypt` /
 `config` / `data` / `user` / `account` is **wrong**. These are
 sibling tools, not libraries. `secret` operates standalone.
 
+This policy is about *sibling tools*, not internal code
+organisation. `libsecstore` (`lib/`) **is** `secret`'s
+own library, shipped inside this package and built from
+this repo — splitting the implementation into a library
+plus a CLI does not violate the policy. The named
+sibling tools above must still never be linked or called.
+(`libsecstore` is deliberately *not* called `libsecret`,
+to avoid the collision with the unrelated GNOME /
+freedesktop Secret Service library of that name.)
+
 ## 5. What is intentionally duplicated
 
 - **Identity computation.** `$(whoami)@$(hostname -f)` — same format
@@ -111,8 +140,12 @@ encrypted-at-rest storage of structured secrets.
 ## 7. Build / install
 
 `./configure && make install` (autoconf umbrella per
-FEAT-191). Stow-based install. `master` is always
-installable; releases are tagged via `.rpk/version`.
+FEAT-191). `make` compiles `libsecstore` and the `secret`
+binary (needs a C compiler); `make install` stows the
+binary, the library (`libsecstore.so` / `.a`), the public
+header (`secstore.h`), the man page and completion.
+`master` is always installable; releases are tagged via
+`.rpk/version`.
 
 After cloning, install the versioned git hooks with
 `make install-hooks` so the pre-push test gate runs

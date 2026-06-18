@@ -13,6 +13,13 @@ Or in two steps:
     ./configure --prefix=$HOME/.local
     make install
 
+`secret` is a C program: `make` compiles the `libsecstore` library
+(`lib/`) and links the `secret` binary (`src/`) against it. A C compiler
+(`cc`/`gcc`) is required; the runtime still shells out to `gpg(1)`,
+`git(1)`, `pass(1)`, `ssh(1)` and `qrencode(1)` for the heavy lifting, so
+on-disk and on-wire formats stay compatible with the original shell tool
+and its peers.
+
 ## Quick start
 
     secret help
@@ -22,8 +29,10 @@ Or in two steps:
 
 | Path | Purpose |
 |---|---|
-| `bin/secret` | the entry point |
-| `libexec/secret/` | sub-commands (where applicable) |
+| `bin/secret` | the compiled entry point (built by `make`) |
+| `lib/` | `libsecstore` — the C library implementing every subcommand |
+| `lib/secstore.h` | public library header |
+| `src/secret.c` | the CLI dispatcher (flag parsing + shortcut + routing) |
 | `docs/secret.md` | CLI contract reference |
 | `share/man/man1/secret.1` | man page |
 | `share/doc/secret/standards/` | vendored references (educational) |
@@ -46,7 +55,10 @@ Or in two steps:
 This package follows the rpk per-script repo convention:
 
 - Per-script repo: this repo contains only `secret`'s artefacts.
-- No shared library: helper boilerplate is duplicated, not factored out (see `CLAUDE.md` §4–5).
+- No *sibling-tool* dependency: `secret` never calls `crypt` / `config` /
+  `account` at runtime (see `CLAUDE.md` §4–5). `libsecstore` is `secret`'s
+  own internal C library, shipped with this package — not a shared
+  dependency on another tool.
 - Stow-based install via `make install`.
 - Versioning: semver, with `.rpk/version` as the source of truth and `.rpk/versions` as the per-release SHA ledger.
 

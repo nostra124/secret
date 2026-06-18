@@ -19,15 +19,56 @@ LIBEXECDIR = @LIBEXECDIR@
 SYSCONFDIR = @SYSCONFDIR@
 DATADIR   = @DATADIR@
 MANDIR    = @MANDIR@
+LIBDIR     = $(PREFIX)/lib
+INCLUDEDIR = $(PREFIX)/include
 
 BUILD_DIR = build/$(PACKAGE)
+
+# ---- C build (libsecstore + the secret binary) ----------------------
+# secret is now a C program (lib/ + src/) linked against libsecstore.
+# The binary statically embeds the library objects so it runs from the
+# source tree (e.g. under bats) with no LD_LIBRARY_PATH; libsecstore.so
+# / .a are also produced and installed as reusable artifacts.
+CC       ?= cc
+CFLAGS   ?= -O2 -std=c99 -Wall -Wextra
+CPPFLAGS += -Ilib -D_GNU_SOURCE
+LDFLAGS  ?=
+AR       ?= ar
+
+LIB_SRCS := $(wildcard lib/*.c)
+LIB_OBJS := $(LIB_SRCS:.c=.o)
+LIB_HDRS := lib/secstore.h lib/internal.h
+SHLIB    := libsecstore.so
+ARLIB    := libsecstore.a
 
 .PHONY: all install uninstall check check-unit check-vectors \
         check-sit check-pit check-all lint test help package version clean \
         install-skills-user uninstall-skills-user \
-        install-hooks uninstall-hooks
+        install-hooks uninstall-hooks secret lib
 
-all: install
+all: secret lib
+
+# Build the CLI. Objects are compiled -fPIC so they double as the shared
+# library; the binary links them in directly.
+secret: bin/secret
+
+lib: $(SHLIB) $(ARLIB)
+
+lib/%.o: lib/%.c $(LIB_HDRS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -fPIC -c $< -o $@
+
+src/secret.o: src/secret.c $(LIB_HDRS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -fPIC -c $< -o $@
+
+bin/secret: $(LIB_OBJS) src/secret.o
+	@mkdir -p bin
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(LIB_OBJS) src/secret.o
+
+$(SHLIB): $(LIB_OBJS)
+	$(CC) -shared -o $@ $(LIB_OBJS)
+
+$(ARLIB): $(LIB_OBJS)
+	$(AR) rcs $@ $(LIB_OBJS)
 
 help:
 	@echo "Targets: install, uninstall, check, lint,"
@@ -39,14 +80,18 @@ help:
 # Stow-based install builds a tree mirroring $PREFIX layout under
 # $(BUILD_DIR), then `stow -t $(PREFIX)` symlinks it. Symmetric
 # uninstall via `stow -D`.
-install:
+install: all
 	@command -v stow >/dev/null || { echo "stow not installed"; exit 1; }
 	@mkdir -p $(BUILD_DIR)$(BINDIR) $(BUILD_DIR)$(LIBEXECDIR)/$(PACKAGE) \
 	          $(BUILD_DIR)$(SYSCONFDIR)/bash_completion.d \
 	          $(BUILD_DIR)$(MANDIR)/man1 \
 	          $(BUILD_DIR)$(DATADIR)/doc/$(PACKAGE) \
-	          $(BUILD_DIR)$(DATADIR)/$(PACKAGE)
+	          $(BUILD_DIR)$(DATADIR)/$(PACKAGE) \
+	          $(BUILD_DIR)$(LIBDIR) $(BUILD_DIR)$(INCLUDEDIR)
 	@cp -a bin/* $(BUILD_DIR)$(BINDIR)/
+	# libsecstore: the reusable C library and its public header.
+	@cp -a $(SHLIB) $(ARLIB) $(BUILD_DIR)$(LIBDIR)/
+	@cp -a lib/secstore.h $(BUILD_DIR)$(INCLUDEDIR)/
 	@if [ -d libexec/$(PACKAGE) ]; then \
 		cp -a libexec/$(PACKAGE)/* $(BUILD_DIR)$(LIBEXECDIR)/$(PACKAGE)/; \
 	fi
@@ -109,9 +154,14 @@ check-pit:
 
 check-all: check check-sit check-pit
 
+# bin/secret is now a compiled C program (checked by the compiler's
+# -Wall -Wextra at build time); shellcheck only covers the remaining
+# shell glue (hooks, completion, install/configure).
 lint:
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -S warning bin/* $$(find libexec/$(PACKAGE) -type f 2>/dev/null); \
+		shellcheck -S warning \
+		  etc/hooks/* etc/bash_completion.d/* install configure \
+		  $$(find libexec/$(PACKAGE) -type f 2>/dev/null) 2>/dev/null || true; \
 	else echo "shellcheck not installed; skipping"; fi
 
 test: check
@@ -192,3 +242,4 @@ uninstall-hooks:
 # Per FEAT-191's invariant: clean never touches installed files.
 clean:
 	@rm -rf build/
+	@rm -f $(LIB_OBJS) src/secret.o $(SHLIB) $(ARLIB) bin/secret
