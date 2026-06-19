@@ -25,12 +25,20 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+build_secret() {
+	# secret is a compiled C program now; the unit suite runs the
+	# binary at bin/secret, so build it first.
+	echo "pre-push: building bin/secret" >&2
+	make -f Makefile.in bin/secret
+}
+
 run_unit() {
 	if ! command -v bats >/dev/null 2>&1; then
 		echo "pre-push: bats not installed — unit suite cannot run" >&2
 		echo "  install with: apt-get install bats   (or your distro's equivalent)" >&2
 		return 1
 	fi
+	build_secret
 	echo "pre-push: running unit suite (tests/unit/*.bats)" >&2
 	bats tests/unit/*.bats
 }
