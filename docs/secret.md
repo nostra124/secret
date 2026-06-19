@@ -294,6 +294,61 @@ Remove `account`'s public key and re-encrypt without it.
 Exit 0 if `account` is in `store`'s recipients, non-zero
 otherwise.
 
+### Data transfer (import / export)
+
+`secret` can move parameters to and from other secret stores ("sources")
+through a small provider plugin system. The first built-in provider is
+`keyring` — the GNOME / freedesktop **Secret Service** (e.g.
+`gnome-keyring`, KeePassXC), accessed by shelling out to `secret-tool(1)`.
+
+#### `sources`
+
+List the available providers, one per line as `name<TAB>status`, where
+`status` is `available` or `unavailable`. Both built-in providers and
+external `secret-source-<name>` plugins (see below) are listed.
+
+```
+secret sources
+```
+
+#### `export <source> <store>`
+
+Push every parameter of `store` into `source`. For `keyring`, each
+parameter becomes a Secret Service item with attributes
+`application=secret store=<store> param=<param>` and label
+`secret/<store>/<param>`.
+
+```
+secret export keyring bitcoin
+```
+
+#### `import <source> <store>`
+
+Pull `source`'s items for `store` back into the (already-existing) store,
+encrypting each to the store's recipients. For `keyring`, only items in
+`secret`'s own namespace (matching the label/attributes above) are
+imported.
+
+```
+secret import keyring bitcoin
+```
+
+`<store>` must already exist (run `secret init <store>` first); `..`
+segments are rejected as for every other store argument (FEAT-207).
+
+#### External source plugins
+
+A provider that is not built in is resolved to an executable named
+`secret-source-<name>`, searched for in `$PREFIX/libexec/secret/sources/`
+and then on `$PATH`. The protocol is line-oriented and binary-safe via
+base64 — see [`sources.md`](sources.md) for the full specification:
+
+```
+secret-source-<name> available        # exit 0 if the backend is usable
+secret-source-<name> export <store>   # reads  "<param>\t<base64(value)>" lines on stdin
+secret-source-<name> import <store>   # writes "<param>\t<base64(value)>" lines on stdout
+```
+
 ## Environment
 
 | Variable | Effect |

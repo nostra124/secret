@@ -107,6 +107,10 @@ int cmd_add_gpg_key (secstore_t *s, int argc, char **argv);
 int cmd_del_gpg_key (secstore_t *s, int argc, char **argv);
 int cmd_has_gpg_key (secstore_t *s, int argc, char **argv);
 
+int cmd_sources  (secstore_t *s, int argc, char **argv);   /* transfer.c */
+int cmd_export   (secstore_t *s, int argc, char **argv);
+int cmd_import   (secstore_t *s, int argc, char **argv);
+
 #ifdef __cplusplus
 }
 #endif

@@ -87,8 +87,8 @@ static void git_commit_param(secstore_t *s, const char *dir,
 /* ---- core get / set (used by gen / def / qr / ins / rem) ----------- */
 
 /* Decrypt <store>/<param> into *out. Returns 0 on success, -1 if the
- * parameter file is absent. */
-static int get_value(secstore_t *s, const char *store, const char *param,
+ * parameter file is absent. (Exposed to the source providers.) */
+int store_get_value(secstore_t *s, const char *store, const char *param,
                      char **out, size_t *outlen)
 {
 	if (strcmp(store, "password-store") == 0) {
@@ -109,8 +109,9 @@ static int get_value(secstore_t *s, const char *store, const char *param,
 	return rc == 0 ? 0 : -1;
 }
 
-/* Encrypt `value` for `store`'s recipients and commit it. */
-static int set_value(secstore_t *s, const char *store, const char *param,
+/* Encrypt `value` for `store`'s recipients and commit it. (Exposed to
+ * the source providers.) */
+int store_set_value(secstore_t *s, const char *store, const char *param,
                      const char *value, size_t vlen)
 {
 	if (strcmp(store, "password-store") == 0) {
@@ -170,7 +171,7 @@ int cmd_set(secstore_t *s, int argc, char **argv)
 	char  *in = NULL;
 	size_t inlen = 0;
 	read_stdin(&in, &inlen);
-	int rc = set_value(s, store, param, in, inlen);
+	int rc = store_set_value(s, store, param, in, inlen);
 
 	free(in);
 	free(store);
@@ -197,7 +198,7 @@ int cmd_get(secstore_t *s, int argc, char **argv)
 		free(dir);
 		char  *plain = NULL;
 		size_t plen = 0;
-		if (get_value(s, store, param, &plain, &plen) == 0) {
+		if (store_get_value(s, store, param, &plain, &plen) == 0) {
 			if (plen)
 				fwrite(plain, 1, plen, stdout);
 			free(plain);
@@ -255,7 +256,7 @@ int cmd_qr(secstore_t *s, int argc, char **argv)
 	int rc = 1;
 	char  *plain = NULL;
 	size_t plen = 0;
-	if (get_value(s, store, param, &plain, &plen) == 0) {
+	if (store_get_value(s, store, param, &plain, &plen) == 0) {
 		char *qr[] = { "qrencode", "-t", "utf8", NULL };
 		rc = proc_run(qr, NULL, plain, plen, NULL, NULL, 0);
 		free(plain);
@@ -271,7 +272,7 @@ int cmd_gen(secstore_t *s, int argc, char **argv)
 
 	char  *plain = NULL;
 	size_t plen = 0;
-	if (get_value(s, store, param, &plain, &plen) == 0) {
+	if (store_get_value(s, store, param, &plain, &plen) == 0) {
 		if (plen) fwrite(plain, 1, plen, stdout);
 		free(plain);
 		free(store); free(param);
@@ -298,11 +299,11 @@ int cmd_gen(secstore_t *s, int argc, char **argv)
 	secret[33] = '\0';
 	if (ur) fclose(ur);
 
-	set_value(s, store, param, secret, 33);
+	store_set_value(s, store, param, secret, 33);
 
 	char  *out = NULL;
 	size_t olen = 0;
-	if (get_value(s, store, param, &out, &olen) == 0) {
+	if (store_get_value(s, store, param, &out, &olen) == 0) {
 		if (olen) fwrite(out, 1, olen, stdout);
 		free(out);
 	}
@@ -317,10 +318,10 @@ int cmd_def(secstore_t *s, int argc, char **argv)
 
 	char  *plain = NULL;
 	size_t plen = 0;
-	if (get_value(s, store, param, &plain, &plen) != 0) {
+	if (store_get_value(s, store, param, &plain, &plen) != 0) {
 		const char *value = (argc >= 2 && argv[1]) ? argv[1] : "";
 		char *v = xasprintf("%s\n", value);
-		set_value(s, store, param, v, strlen(v));
+		store_set_value(s, store, param, v, strlen(v));
 		free(v);
 	} else {
 		free(plain);
@@ -328,7 +329,7 @@ int cmd_def(secstore_t *s, int argc, char **argv)
 
 	char  *out = NULL;
 	size_t olen = 0;
-	if (get_value(s, store, param, &out, &olen) == 0) {
+	if (store_get_value(s, store, param, &out, &olen) == 0) {
 		if (olen) fwrite(out, 1, olen, stdout);
 		free(out);
 	}
@@ -380,7 +381,7 @@ int cmd_ins(secstore_t *s, int argc, char **argv)
 
 	char  *old = NULL;
 	size_t olen = 0;
-	get_value(s, store, param, &old, &olen);
+	store_get_value(s, store, param, &old, &olen);
 
 	strlist lines;
 	strlist_init(&lines);
@@ -396,7 +397,7 @@ int cmd_ins(secstore_t *s, int argc, char **argv)
 	for (size_t i = 0; i < lines.len; i++)
 		off += (size_t)sprintf(merged + off, "%s\n", lines.items[i]);
 
-	set_value(s, store, param, merged, off);
+	store_set_value(s, store, param, merged, off);
 
 	free(merged);
 	strlist_free(&lines);
@@ -422,7 +423,7 @@ int cmd_rem(secstore_t *s, int argc, char **argv)
 
 	char  *old = NULL;
 	size_t olen = 0;
-	get_value(s, store, param, &old, &olen);
+	store_get_value(s, store, param, &old, &olen);
 
 	strlist lines;
 	strlist_init(&lines);
@@ -445,7 +446,7 @@ int cmd_rem(secstore_t *s, int argc, char **argv)
 	for (size_t i = 0; i < lines.len; i++)
 		off += (size_t)sprintf(merged + off, "%s\n", lines.items[i]);
 
-	set_value(s, store, param, merged, off);
+	store_set_value(s, store, param, merged, off);
 
 	free(merged);
 	strlist_free(&lines);
@@ -483,7 +484,7 @@ int cmd_edit(secstore_t *s, int argc, char **argv)
 
 	char  *plain = NULL;
 	size_t plen = 0;
-	if (get_value(s, store, param, &plain, &plen) == 0) {
+	if (store_get_value(s, store, param, &plain, &plen) == 0) {
 		write_file(tmpl, plain, plen);
 		free(plain);
 	}
@@ -494,7 +495,7 @@ int cmd_edit(secstore_t *s, int argc, char **argv)
 	char  *edited = NULL;
 	size_t elen = 0;
 	read_file(tmpl, &edited, &elen);
-	set_value(s, store, param, edited ? edited : "", elen);
+	store_set_value(s, store, param, edited ? edited : "", elen);
 	free(edited);
 
 	char *shred[] = { "shred", "-f", tmpl, NULL };

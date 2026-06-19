@@ -83,6 +83,71 @@ char *secstore_lower(const char *in)
 	return out;
 }
 
+/* ---- base64 (RFC 4648, used by the external source protocol) ------- */
+
+static const char b64_alpha[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+char *b64_encode(const unsigned char *data, size_t len)
+{
+	size_t olen = 4 * ((len + 2) / 3);
+	char  *out = xmalloc(olen + 1);
+	size_t i, o = 0;
+	for (i = 0; i + 2 < len; i += 3) {
+		unsigned v = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+		out[o++] = b64_alpha[(v >> 18) & 0x3f];
+		out[o++] = b64_alpha[(v >> 12) & 0x3f];
+		out[o++] = b64_alpha[(v >> 6) & 0x3f];
+		out[o++] = b64_alpha[v & 0x3f];
+	}
+	if (i < len) {
+		unsigned v = data[i] << 16;
+		int rem = (int)(len - i);          /* 1 or 2 */
+		if (rem == 2)
+			v |= data[i + 1] << 8;
+		out[o++] = b64_alpha[(v >> 18) & 0x3f];
+		out[o++] = b64_alpha[(v >> 12) & 0x3f];
+		out[o++] = (rem == 2) ? b64_alpha[(v >> 6) & 0x3f] : '=';
+		out[o++] = '=';
+	}
+	out[o] = '\0';
+	return out;
+}
+
+static int b64_val(unsigned char c)
+{
+	if (c >= 'A' && c <= 'Z') return c - 'A';
+	if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+	if (c >= '0' && c <= '9') return c - '0' + 52;
+	if (c == '+') return 62;
+	if (c == '/') return 63;
+	return -1;
+}
+
+unsigned char *b64_decode(const char *text, size_t *out_len)
+{
+	size_t cap = strlen(text) / 4 * 3 + 3, o = 0;
+	unsigned char *out = xmalloc(cap + 1);
+	int acc = 0, bits = 0;
+	for (const char *p = text; *p; p++) {
+		if (*p == '=' || *p == '\n' || *p == '\r' || *p == ' ' || *p == '\t')
+			continue;
+		int v = b64_val((unsigned char)*p);
+		if (v < 0)
+			continue;                      /* skip stray chars */
+		acc = (acc << 6) | v;
+		bits += 6;
+		if (bits >= 8) {
+			bits -= 8;
+			out[o++] = (unsigned char)((acc >> bits) & 0xff);
+		}
+	}
+	out[o] = '\0';
+	if (out_len)
+		*out_len = o;
+	return out;
+}
+
 /* ---- strlist ------------------------------------------------------- */
 
 void strlist_init(strlist *l)
