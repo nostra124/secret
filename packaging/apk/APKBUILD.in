@@ -1,0 +1,36 @@
+# Maintainer: René Driessel <rene@driessel.de>
+pkgname=secret
+pkgver=@VERSION@
+pkgrel=0
+pkgdesc="Multi-store GPG-encrypted secret manager"
+url="https://github.com/nostra124/secret"
+arch="all"
+license="GPL-3.0-or-later"
+# git + gnupg are required; pass / qrencode (libqrencode-tools) /
+# openssh-client are optional runtime helpers pulled in on demand.
+depends="git gnupg"
+makedepends="gcc make musl-dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	make -f Makefile.in all
+}
+
+check() {
+	# bats is not in the build image; the unit suite runs in CI.
+	./bin/secret version >/dev/null
+}
+
+package() {
+	make -f Makefile.in install-dist DESTDIR="$pkgdir" prefix=/usr
+}
+
+dev() {
+	default_dev
+}
+
+doc() {
+	default_doc
+}

@@ -20,6 +20,19 @@ Or in two steps:
 on-disk and on-wire formats stay compatible with the original shell tool
 and its peers.
 
+## Packages
+
+Native packages are built from the source tree under `packaging/`:
+
+    make package-deb       # Debian / Ubuntu   (dpkg-deb)
+    make package-rpm       # Fedora / RHEL     (rpmbuild)
+    make package-apk       # Alpine            (abuild)
+    make package-macos     # macOS .pkg        (pkgbuild)
+    make packages          # everything this host can build
+
+Artifacts land in `dist/`. See `packaging/README.md` for the per-format
+details and runtime-dependency names.
+
 ## Quick start
 
     secret help

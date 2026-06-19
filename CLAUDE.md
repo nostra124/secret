@@ -147,6 +147,14 @@ header (`secstore.h`), the man page and completion.
 `master` is always installable; releases are tagged via
 `.rpk/version`.
 
+Native packages live under `packaging/` (deb / rpm / apk /
+macOS pkg). Each `packaging/<fmt>/build.sh` stages files
+via the `install-dist` Makefile target (a plain, non-stow
+`DESTDIR` + `prefix` install) and wraps them with the
+platform's packager; `make package-<fmt>` or `make
+packages` drive them. Output goes to `dist/` (git-ignored).
+See `packaging/README.md`.
+
 After cloning, install the versioned git hooks with
 `make install-hooks` so the pre-push test gate runs
 locally. See `skills/testing.md` for the full

@@ -1,0 +1,18 @@
+Package: secret
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: @MAINTAINER@
+Installed-Size: @INSTALLED_SIZE@
+Depends: libc6, git, gnupg
+Recommends: pass, qrencode, openssh-client
+Section: utils
+Priority: optional
+Homepage: https://github.com/nostra124/secret
+Description: Multi-store GPG-encrypted secret manager
+ secret manages GPG-encrypted-at-rest secrets across multiple
+ git-backed stores, with pass(1) integration and SSH sync between
+ peers. Each store is a git repository and each parameter is
+ encrypted to the store's recipients.
+ .
+ This package also ships libsecstore (shared and static) and its
+ public header for embedding the secret store engine in other tools.

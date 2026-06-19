@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>secret @VERSION@</title>
+    <organization>de.driessel</organization>
+    <options customize="never" require-scripts="false"
+             hostArchitectures="arm64,x86_64"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="de.driessel.secret"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="de.driessel.secret" visible="false">
+        <pkg-ref id="de.driessel.secret"/>
+    </choice>
+    <pkg-ref id="de.driessel.secret" version="@VERSION@"
+             onConclusion="none">secret-component.pkg</pkg-ref>
+</installer-gui-script>
