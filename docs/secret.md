@@ -196,8 +196,27 @@ runs `pass rm -f <param>`.
 
 #### `qr <store>/<param>`
 
-Decrypt and pipe through `qrencode -t utf8` for terminal display.
+QR-encode for terminal display (via `qrencode -t utf8`). Template-aware:
+- a **wifi** entry (has `ssid` + `password`) yields a scannable
+  `WIFI:T:…;S:…;P:…;H:…;;` join code;
+- an **mfa** entry (has `secret`, standalone or at `<entry>/mfa/secret`)
+  yields an `otpauth://totp/…` provisioning code;
+- otherwise the parameter's raw value is encoded.
+
 Requires `qrencode(1)`.
+
+#### `clip <store>/<param>`
+
+Copy a parameter's value to the system clipboard, then auto-clear it
+after a timeout (default 45s; `$SECRET_CLIP_TIME`, `0` disables). The
+backend is auto-detected — `wl-copy` (when `$WAYLAND_DISPLAY` is set),
+`xclip`/`xsel` (when `$DISPLAY` is set), `pbcopy`, or `clip.exe` — or
+overridden with `$SECRET_CLIP_CMD` (a shell command fed the value on
+stdin).
+
+```
+secret clip bitcoin/api:key
+```
 
 #### `gen <store>/<param>`
 
@@ -378,6 +397,56 @@ base64 — see [`sources.md`](sources.md) for the full specification:
 secret-source-<name> available        # exit 0 if the backend is usable
 secret-source-<name> export <store>   # reads  "<param>\t<base64(value)>" lines on stdin
 secret-source-<name> import <store>   # writes "<param>\t<base64(value)>" lines on stdout
+```
+
+### Template commands
+
+Templates are named schemas of fields for common structured secrets. A
+template carries no persistent state — `new` simply materialises each
+field as its own parameter (`<entry>/<field>`), so the result is ordinary
+parameters that every other verb (get/set/params/export/…) already
+handles. See [`templates.md`](templates.md) for the full field lists.
+
+#### `templates [name]`
+
+List the built-in templates, or print one template's fields (with
+`[secret]` / `[generated]` / `[optional]` / `[multiline]` flags and
+defaults).
+
+```
+secret templates
+secret templates wifi
+```
+
+#### `new <template> <store>/<entry> [field=value …] [--attach]`
+
+Create an entry from `template`: each field is stored under
+`<entry>/<field>`. Field values come from `field=value` arguments, the
+template's defaults, auto-generation (for `[generated]` secret fields
+left unset), or an interactive prompt (TTY only); `[optional]` fields are
+skipped when unset. The store is auto-initialised if missing.
+
+Extension templates (`mfa`, `passkey`) may be `--attach`ed to an existing
+entry, in which case their fields land under `<entry>/<template>/<field>`.
+
+```
+secret new login   accounts/github username=octocat
+secret new wifi    networks/home ssid=HomeNet password=hunter2 security=wpa3
+secret new wallet  coins/btc "mnemonic=word1 word2 …" derivation=m/84'/0'/0'
+secret new mfa     accounts/github --attach secret=JBSWY3DPEHPK3PXP
+```
+
+#### `otp <store>/<entry> [-c]`
+
+Print the current TOTP code for an `mfa` entry, shelling out to
+`oathtool(1)`. The seed is read from `<entry>/secret` (standalone) or
+`<entry>/mfa/secret` (attached), honouring the entry's `algorithm`,
+`digits` and `period` fields. With `-c` / `--clip`, copy the code to the
+clipboard (auto-clearing) instead of printing it.
+
+```
+secret otp accounts/github          # print
+secret otp accounts/github -c       # copy to clipboard
 ```
 
 ## Environment

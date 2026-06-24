@@ -19,6 +19,13 @@
   freedesktop Secret Service, through `secret-tool`) plus
   external `secret-source-<name>` plugins. See
   `docs/sources.md`.
+- structured-entry **templates** (`login` / `wifi` / `mfa`
+  / `passkey` / `wallet`) materialised one-param-per-field
+  by `secret new`, with template-bound actions duck-typed
+  on the fields: `secret qr` (WiFi join / `otpauth` codes),
+  `secret otp` (TOTP via `oathtool`, `-c` to clipboard) and
+  the general `secret clip` (clipboard with auto-clear). See
+  `docs/templates.md`.
 
 Out of scope: cryptography primitives separate from GPG,
 generic config file management.
@@ -67,6 +74,12 @@ ship under `libexec/secret/sources/` — currently
 `secret-source-keepass` (Python + `pykeepass`, for KeePass
 `.kdbx` files); the binary discovers them at
 `<exe>/../libexec/secret/sources/` and on `$PATH`.
+
+The structured-entry template system lives in
+`lib/template.c` (the `templates` / `new` / `otp` verbs);
+templates are pure schemas (no on-disk binding) that
+`new` expands into one parameter per field. See
+`docs/templates.md`.
 
 Logging: four levels (`debug` / `info` / `warn` /
 `error`) plus a `fatal` convenience (= error + exit).

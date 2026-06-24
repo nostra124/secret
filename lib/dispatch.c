@@ -47,6 +47,10 @@ static const struct {
 	{ "sources",     cmd_sources     },
 	{ "export",      cmd_export      },
 	{ "import",      cmd_import      },
+	{ "templates",   cmd_templates   },
+	{ "new",         cmd_new         },
+	{ "otp",         cmd_otp         },
+	{ "clip",        cmd_clip        },
 	{ NULL,          NULL            },
 };
 

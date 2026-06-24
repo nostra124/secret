@@ -52,7 +52,8 @@ static void print_general(secstore_t *s)
 "   set <store>/<param>           set parameter <store>/<param> from stdin\n"
 "   get <store>/<param>           get parameter <store>/<param> to stdout\n"
 "   del <store>/<param>           delete param <param> in store <store>\n"
-"   qr  <store>/<param>           get param <param> in store <store> as qrcode\n"
+"   qr  <store>/<param>           QR-encode a param (or a wifi/mfa entry)\n"
+"   clip <store>/<param>          copy a param to the clipboard (auto-clears)\n"
 "   gen <store>/<param>           generates a random and prints to stdout\n"
 "   def <store>/<param> <value>   creates a default with a default value\n"
 "   ins <store>/<param>           inserts the line into param from stdin\n"
@@ -75,6 +76,11 @@ static void print_general(secstore_t *s)
 "   sources                       list import/export sources and availability\n"
 "   export <source> <store>       push a store's parameters to <source>\n"
 "   import <source> <store>       pull <source>'s items into <store>\n"
+"\n"
+"template commands\n"
+"   templates [name]              list entry templates, or show one's fields\n"
+"   new <template> <store>/<name> create a structured entry from a template\n"
+"   otp <store>/<name> [-c]       print (or -c copy) the current TOTP code\n"
 "\n",
 		self, self, self, self, self);
 }
