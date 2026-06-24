@@ -36,7 +36,10 @@ structure.
 
 ## External plugin protocol
 
-The plugin is invoked as `secret-source-<name> <verb> [<store>]`.
+The plugin is invoked as `secret-source-<name> <verb> [<store>] [opts…]`.
+Any options the user gives after `<store>` on the `secret import/export`
+command line are **forwarded verbatim** as `opts…`, so a plugin can take
+its own flags (e.g. `--db`, `--group`).
 
 ### `available`
 
@@ -122,6 +125,53 @@ Items are namespaced so import only ever touches `secret`'s own data:
 
 Requires a running Secret Service provider (e.g. `gnome-keyring-daemon`)
 and `secret-tool` on `$PATH`.
+
+### Foreign keyring items (`--query`)
+
+By default `import` only round-trips `secret`'s own namespaced items. To
+pull items stored by **other** applications, pass one or more
+`--query attr=value` selectors (ANDed, forwarded to `secret-tool search
+--all`) and optionally `--prefix p` to namespace the result:
+
+```
+secret import keyring personal --query application=org.gnome.Epiphany --prefix web
+```
+
+Each matched item's **label** is sanitised into a parameter id
+(lowercased; runs of unsafe characters collapsed to `-`; `..` rejected),
+and its value — reconstructed from the `search --all` block, including
+multiline secrets — is stored under `<store>/[<prefix>/]<param>`.
+Export to foreign namespaces is intentionally not supported.
+
+## Built-in/bundled: `keepass` (KeePass .kdbx)
+
+The bundled external plugin `secret-source-keepass`
+(`$PREFIX/libexec/secret/sources/`) bridges to a KeePass database using
+the pure-Python [`pykeepass`](https://github.com/libkeepass/pykeepass)
+library — no KeePassXC or Qt dependency.
+
+| secret concept | KeePass concept |
+|---|---|
+| store | group (named after the store, or `--group`) |
+| parameter id (`host/name`) | entry title |
+| parameter value | entry password field |
+
+Configuration (CLI flag overrides environment):
+
+| Flag | Env | Meaning |
+|---|---|---|
+| `--db PATH` | `KEEPASS_DB` | the `.kdbx` file (created on first export) |
+| `--group NAME` | — | group for this store (default: the store name) |
+| `--keyfile PATH` | `KEEPASS_KEYFILE` | optional key file |
+| — | `KEEPASS_PASSWORD` / `KEEPASS_PASSWORD_FILE` | database password |
+
+```
+export KEEPASS_DB=~/secrets.kdbx KEEPASS_PASSWORD=…
+secret export keepass bitcoin
+secret import keepass bitcoin
+```
+
+Requires `python3` with `pykeepass` (Debian/Ubuntu: `python3-pykeepass`).
 
 ## See also
 
