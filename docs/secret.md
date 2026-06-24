@@ -288,6 +288,55 @@ at the destination, runs `ssh $ACCOUNT $SELF init $store` first.
 Pull every store from `account`, then push every store to
 `account`. Same warn-on-unreachable behaviour as `pull`/`push`.
 
+### HTTP sharing (pull only)
+
+In addition to SSH peers, stores can be **pulled** over HTTP from
+**groups** of endpoints. Pushing stays on SSH (`push`/`sync`). Only
+GPG ciphertext and public keys are served, so the channel needs no
+transport encryption to stay confidential. See [`sharing.md`](sharing.md).
+
+#### `serve`
+
+Run a read-only HTTP server exposing every store's git repository for
+"dumb HTTP" git pull under `/app/secret/<store>`. Binds
+`$SECRET_HTTP_BIND` (default `0.0.0.0`) on the port from `port` below.
+Runs until interrupted.
+
+```
+secret serve
+# peer:  git clone http://<host>:<port>/app/secret/<store>
+```
+
+#### `port`
+
+Print the TCP port the server uses: `$SECRET_HTTP_PORT` if set, else a
+value derived deterministically from the effective uid
+(`49152 + uid % 16384`). A same-uid peer therefore knows the port
+without configuration.
+
+#### `groups [group]`
+
+List sharing groups and their endpoints as `group<TAB>endpoint` lines
+(all groups, or just `group`).
+
+#### `group-add <group> <endpoint>` / `group-del <group> <endpoint>`
+
+Add or remove an endpoint in a group (stored under
+`$SELF_CONFIG/.groups/<group>`). An endpoint may be `host`,
+`host:port`, or a full `http(s)://host[:port]` URL; a missing port
+defaults to the local `port`.
+
+#### `pull-http <store> [group]`
+
+Pull `store` from a group's endpoints over HTTP (or from every group
+when none is named) — cloning it if absent, otherwise pulling and
+auto-resolving conflicts by taking the remote side. Pull only.
+
+```
+secret group-add team http://alice.example
+secret pull-http bitcoin team
+```
+
 ### Account encryption commands
 
 #### `gpg-keys [store [param]]`
@@ -464,6 +513,9 @@ secret otp accounts/github -c       # copy to clipboard
 | `SELF_VERBOSE` | Enables `set -vx` at a different point in the script (legacy). |
 | `SELF_PLACE` | Defaults to `user`. Currently unused at runtime. |
 | `SELF_PREFIX` | Optional sudo-style prefix for `mkdir -p` on the config dir. |
+| `SECRET_HTTP_PORT` | Override the `serve`/`pull-http` port (default: `49152 + uid % 16384`). |
+| `SECRET_HTTP_BIND` | Address `serve` binds to (default `0.0.0.0`). |
+| `SECRET_CLIP_CMD` / `SECRET_CLIP_TIME` | Clipboard command override / auto-clear seconds (default 45). |
 
 ## Files
 

@@ -117,6 +117,14 @@ int cmd_otp      (secstore_t *s, int argc, char **argv);
 
 int cmd_clip     (secstore_t *s, int argc, char **argv);   /* clip.c */
 
+int cmd_serve    (secstore_t *s, int argc, char **argv);   /* http.c */
+int cmd_port     (secstore_t *s, int argc, char **argv);
+
+int cmd_groups   (secstore_t *s, int argc, char **argv);   /* group.c */
+int cmd_group_add(secstore_t *s, int argc, char **argv);
+int cmd_group_del(secstore_t *s, int argc, char **argv);
+int cmd_pull_http(secstore_t *s, int argc, char **argv);
+
 #ifdef __cplusplus
 }
 #endif

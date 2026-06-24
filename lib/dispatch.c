@@ -51,6 +51,12 @@ static const struct {
 	{ "new",         cmd_new         },
 	{ "otp",         cmd_otp         },
 	{ "clip",        cmd_clip        },
+	{ "serve",       cmd_serve       },
+	{ "port",        cmd_port        },
+	{ "groups",      cmd_groups      },
+	{ "group-add",   cmd_group_add   },
+	{ "group-del",   cmd_group_del   },
+	{ "pull-http",   cmd_pull_http   },
 	{ NULL,          NULL            },
 };
 

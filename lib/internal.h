@@ -181,6 +181,17 @@ unsigned char *b64_decode(const char *text, size_t *out_len);
  * no clipboard backend is available. */
 void secstore_clip(secstore_t *s, const char *data, size_t len);
 
+/* ---- http sync (http.c / group.c) ---------------------------------- */
+/* TCP port for the HTTP pull server: $SECRET_HTTP_PORT, else a value
+ * deterministically derived from the effective uid. */
+int  secstore_http_port(secstore_t *s);
+/* Path to the groups config directory ($SELF_CONFIG/.groups). */
+char *groups_dir(secstore_t *s);
+/* Normalise a group endpoint into a base URL (adds scheme/port as
+ * needed, using the local derived port when none is given). Caller
+ * frees. */
+char *endpoint_base_url(secstore_t *s, const char *endpoint);
+
 /* ---- parameter parsing (param.c / store.c shared) ------------------ */
 
 /* Parse a raw "<store>/<param>" (or "<store>:<a>:<b>") argument the way
