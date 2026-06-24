@@ -41,10 +41,11 @@ LIB_HDRS := lib/secstore.h lib/internal.h
 SHLIB    := libsecstore.so
 ARLIB    := libsecstore.a
 
-.PHONY: all install uninstall check check-unit check-vectors \
+.PHONY: all install install-dist uninstall check check-unit check-vectors \
         check-sit check-pit check-all lint test help package version clean \
         install-skills-user uninstall-skills-user \
-        install-hooks uninstall-hooks secret lib
+        install-hooks uninstall-hooks secret lib \
+        package-deb package-rpm package-apk package-macos packages
 
 all: secret lib
 
@@ -69,6 +70,62 @@ $(SHLIB): $(LIB_OBJS)
 
 $(ARLIB): $(LIB_OBJS)
 	$(AR) rcs $@ $(LIB_OBJS)
+
+# ---- staging install for packaging ----------------------------------
+# A plain (non-stow) install into $(DESTDIR)$(prefix), used by every
+# native package recipe under packaging/. GNU-style lowercase dir vars
+# are kept deliberately separate from the autoconf @UPPER@ ones above so
+# a packager only needs to pass `prefix=` and `DESTDIR=` on the command
+# line (which override these defaults).
+# pkgname defaults to secret so `make -f Makefile.in install-dist` works
+# even when the @PACKAGE@ autoconf var has not been substituted.
+pkgname     ?= secret
+prefix      ?= /usr/local
+exec_prefix ?= $(prefix)
+bindir      ?= $(exec_prefix)/bin
+libdir      ?= $(exec_prefix)/lib
+includedir  ?= $(prefix)/include
+sysconfdir  ?= /etc
+datarootdir ?= $(prefix)/share
+mandir      ?= $(datarootdir)/man
+docdir      ?= $(datarootdir)/doc/$(pkgname)
+INSTALL     ?= install
+
+install-dist: all
+	$(INSTALL) -d $(DESTDIR)$(bindir) $(DESTDIR)$(libdir) \
+	    $(DESTDIR)$(includedir) $(DESTDIR)$(mandir)/man1 \
+	    $(DESTDIR)$(sysconfdir)/bash_completion.d \
+	    $(DESTDIR)$(datarootdir)/$(pkgname) $(DESTDIR)$(docdir)
+	$(INSTALL) -m 0755 bin/secret      $(DESTDIR)$(bindir)/secret
+	$(INSTALL) -m 0755 $(SHLIB)        $(DESTDIR)$(libdir)/$(SHLIB)
+	$(INSTALL) -m 0644 $(ARLIB)        $(DESTDIR)$(libdir)/$(ARLIB)
+	$(INSTALL) -m 0644 lib/secstore.h  $(DESTDIR)$(includedir)/secstore.h
+	$(INSTALL) -m 0644 share/man/man1/secret.1 \
+	    $(DESTDIR)$(mandir)/man1/secret.1
+	$(INSTALL) -m 0644 etc/bash_completion.d/secret \
+	    $(DESTDIR)$(sysconfdir)/bash_completion.d/secret
+	$(INSTALL) -m 0644 VERSION         $(DESTDIR)$(datarootdir)/$(pkgname)/version
+	$(INSTALL) -m 0644 docs/secret.md  $(DESTDIR)$(docdir)/secret.md
+	$(INSTALL) -m 0644 Readme.md       $(DESTDIR)$(docdir)/README.md
+
+# ---- native packages ------------------------------------------------
+# Each recipe stages via `install-dist` then wraps with the platform's
+# packager. `packages` builds whatever this host can build; the rest are
+# invoked directly on the matching platform. Artifacts land in dist/.
+package-deb:
+	@packaging/deb/build.sh
+
+package-rpm:
+	@packaging/rpm/build.sh
+
+package-apk:
+	@packaging/apk/build.sh
+
+package-macos:
+	@packaging/macos/build.sh
+
+packages:
+	@packaging/build.sh
 
 help:
 	@echo "Targets: install, uninstall, check, lint,"
@@ -241,5 +298,5 @@ uninstall-hooks:
 
 # Per FEAT-191's invariant: clean never touches installed files.
 clean:
-	@rm -rf build/
+	@rm -rf build/ dist/
 	@rm -f $(LIB_OBJS) src/secret.o $(SHLIB) $(ARLIB) bin/secret

@@ -4,6 +4,9 @@ Makefile
 # Make build tree
 build/
 
+# Packaging output (deb / rpm / apk / pkg artifacts)
+dist/
+
 # C build artifacts. bin/secret is now a compiled binary (built from
 # lib/ + src/), not a tracked script — build it with `make`.
 *.o
