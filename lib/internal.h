@@ -132,6 +132,50 @@ typedef int (*secstore_cmd_fn)(secstore_t *, int, char **);
 /* Look up a subcommand by name; NULL if it is not a known command. */
 secstore_cmd_fn secstore_lookup(const char *name);
 
+/* ---- source providers: import/export plugin system (source.c) ------ */
+/* A "source" is an external secret store secret can move parameters to
+ * and from. Built-in providers (e.g. the GNOME keyring) are entries in a
+ * compiled-in table; external providers are `secret-source-<name>`
+ * executables discovered in $libexecdir/secret/sources/ and on $PATH,
+ * bridged through a small base64 line protocol. */
+struct secret_source;
+typedef struct secret_source {
+	char *name;
+	/* Backend usable right now? (e.g. secret-tool present). */
+	int (*available)(secstore_t *s, const struct secret_source *self);
+	/* Push every <store> parameter into the backend. */
+	int (*do_export)(secstore_t *s, const struct secret_source *self,
+	                 const char *store, int argc, char **argv);
+	/* Pull the backend's items for <store> into the store. */
+	int (*do_import)(secstore_t *s, const struct secret_source *self,
+	                 const char *store, int argc, char **argv);
+	char *path;   /* external providers: executable path; NULL if built-in */
+} secret_source;
+
+/* Resolve a provider by name (built-in table first, then an external
+ * secret-source-<name> executable). Returns NULL if unknown; sets *owned
+ * to 1 when the caller must secret_source_free() the result. */
+secret_source *secret_source_lookup(secstore_t *s, const char *name, int *owned);
+void           secret_source_free(secret_source *src);
+/* "name\tavailable" / "name\tunavailable" lines for every provider. */
+void           secret_source_list(secstore_t *s, strlist *out);
+
+/* The built-in GNOME keyring provider (source_keyring.c). */
+extern const secret_source secret_source_keyring;
+
+/* ---- store value get/set (param.c, shared with source providers) --- */
+/* Decrypt <store>/<param> into *out (caller frees). 0 on success, -1 if
+ * the parameter is absent. */
+int store_get_value(secstore_t *s, const char *store, const char *param,
+                    char **out, size_t *outlen);
+/* Encrypt `value` for the store's recipients and commit it. */
+int store_set_value(secstore_t *s, const char *store, const char *param,
+                    const char *value, size_t vlen);
+
+/* ---- base64 (util.c) ----------------------------------------------- */
+char          *b64_encode(const unsigned char *data, size_t len);
+unsigned char *b64_decode(const char *text, size_t *out_len);
+
 /* ---- parameter parsing (param.c / store.c shared) ------------------ */
 
 /* Parse a raw "<store>/<param>" (or "<store>:<a>:<b>") argument the way

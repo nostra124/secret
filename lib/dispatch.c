@@ -44,6 +44,9 @@ static const struct {
 	{ "add-gpg-key", cmd_add_gpg_key },
 	{ "del-gpg-key", cmd_del_gpg_key },
 	{ "has-gpg-key", cmd_has_gpg_key },
+	{ "sources",     cmd_sources     },
+	{ "export",      cmd_export      },
+	{ "import",      cmd_import      },
 	{ NULL,          NULL            },
 };
 

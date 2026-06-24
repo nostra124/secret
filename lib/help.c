@@ -70,6 +70,11 @@ static void print_general(secstore_t *s)
 "   add-gpg-key <store> <account> adds the gpg-key to the store\n"
 "   del-gpg-key <store> <account> deletes the gpg-key from the store\n"
 "   has-gpg-key <store> <account> checks if the store has the gpg-key\n"
+"\n"
+"data transfer commands\n"
+"   sources                       list import/export sources and availability\n"
+"   export <source> <store>       push a store's parameters to <source>\n"
+"   import <source> <store>       pull <source>'s items into <store>\n"
 "\n",
 		self, self, self, self, self);
 }

@@ -14,6 +14,11 @@
 - the `pass(1)` password-store integration
   (`pass-init` per FEAT-041)
 - git-backed sync of stores between peers via SSH
+- import/export to other secret stores ("sources") via a
+  provider plugin system — built-in `keyring` (GNOME /
+  freedesktop Secret Service, through `secret-tool`) plus
+  external `secret-source-<name>` plugins. See
+  `docs/sources.md`.
 
 Out of scope: cryptography primitives separate from GPG,
 generic config file management.
@@ -47,7 +52,16 @@ The runtime still shells out to `gpg(1)`, `git(1)`,
 `pass(1)`, `ssh(1)` and `qrencode(1)` — the same external
 tools the original shell version used — so on-disk
 ciphertext and on-wire git formats remain interoperable
-with peers running either implementation.
+with peers running either implementation. The `keyring`
+source provider additionally shells out to `secret-tool(1)`
+(libsecret) for the GNOME Secret Service.
+
+The import/export source providers live in `lib/source.c`
+(registry + external-plugin bridge), `lib/source_keyring.c`
+(the built-in keyring provider) and `lib/transfer.c` (the
+`import`/`export`/`sources` verbs). The provider contract
+and the external `secret-source-<name>` plugin protocol are
+specified in `docs/sources.md`.
 
 Logging: four levels (`debug` / `info` / `warn` /
 `error`) plus a `fatal` convenience (= error + exit).
