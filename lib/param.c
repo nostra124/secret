@@ -5,6 +5,7 @@
  * "<store>/<param>" (or "<store>/<a>:<b>") argument into its components.
  */
 #define _XOPEN_SOURCE 700
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -246,22 +247,132 @@ int cmd_del(secstore_t *s, int argc, char **argv)
 	return 0;
 }
 
+/* Read <base>/<name>, trimmed of trailing whitespace; NULL if absent. */
+static char *qr_field(secstore_t *s, const char *store, const char *base,
+                      const char *name)
+{
+	char  *p = xasprintf("%s/%s", base, name);
+	char  *v = NULL;
+	size_t n = 0;
+	int rc = store_get_value(s, store, p, &v, &n);
+	free(p);
+	if (rc != 0) { free(v); return NULL; }
+	while (n > 0 && (v[n-1] == '\n' || v[n-1] == '\r' ||
+	                 v[n-1] == ' '  || v[n-1] == '\t'))
+		v[--n] = '\0';
+	return v;
+}
+
+/* Backslash-escape the WiFi-QR metacharacters \ ; , : " */
+static char *wifi_escape(const char *in)
+{
+	char  *out = xmalloc(strlen(in) * 2 + 1);
+	char  *w = out;
+	for (const char *p = in; *p; p++) {
+		if (*p == '\\' || *p == ';' || *p == ',' || *p == ':' || *p == '"')
+			*w++ = '\\';
+		*w++ = *p;
+	}
+	*w = '\0';
+	return out;
+}
+
+/* Percent-encode everything outside the RFC 3986 unreserved set. */
+static char *pct_encode(const char *in)
+{
+	static const char hex[] = "0123456789ABCDEF";
+	char  *out = xmalloc(strlen(in) * 3 + 1);
+	char  *w = out;
+	for (const unsigned char *p = (const unsigned char *)in; *p; p++) {
+		if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+		    (*p >= '0' && *p <= '9') || *p == '-' || *p == '_' ||
+		    *p == '.' || *p == '~') {
+			*w++ = (char)*p;
+		} else {
+			*w++ = '%'; *w++ = hex[*p >> 4]; *w++ = hex[*p & 0xf];
+		}
+	}
+	*w = '\0';
+	return out;
+}
+
+static int qr_emit(const char *payload, size_t len)
+{
+	char *qr[] = { "qrencode", "-t", "utf8", NULL };
+	return proc_run(qr, NULL, payload, len, NULL, NULL, 0);
+}
+
 int cmd_qr(secstore_t *s, int argc, char **argv)
 {
 	if (argc < 1 || !argv[0] || !*argv[0])
 		secstore_fatal(s, "please specify a parameter");
-	char *store = NULL, *param = NULL;
-	parse_param(s, argv[0], 1, &store, &param);
+	char *store = NULL, *path = NULL;
+	parse_param(s, argv[0], 1, &store, &path);
 
 	int rc = 1;
+
+	/* Template-aware QR: a wifi entry (ssid+password) yields a scannable
+	 * WIFI: join code; an mfa entry yields an otpauth:// provisioning
+	 * code; otherwise the parameter's raw value is encoded. */
+	char *ssid = qr_field(s, store, path, "ssid");
+	char *wpw  = ssid ? qr_field(s, store, path, "password") : NULL;
+	if (ssid && wpw) {
+		char *sec = qr_field(s, store, path, "security");
+		char *hid = qr_field(s, store, path, "hidden");
+		const char *type = "WPA";
+		if (sec) {
+			if (strcasestr(sec, "wep")) type = "WEP";
+			else if (strcasestr(sec, "none") || strcasestr(sec, "open") ||
+			         strcasestr(sec, "nopass") || !*sec) type = "nopass";
+		}
+		int hidden = hid && (strcasestr(hid, "true") || !strcmp(hid, "1") ||
+		                     strcasestr(hid, "yes") || strcasestr(hid, "on"));
+		char *es = wifi_escape(ssid), *ep = wifi_escape(wpw);
+		char *uri = xasprintf("WIFI:T:%s;S:%s;P:%s;H:%s;;",
+		                      type, es, ep, hidden ? "true" : "false");
+		rc = qr_emit(uri, strlen(uri));
+		free(uri); free(ep); free(es); free(hid); free(sec);
+		free(wpw); free(ssid);
+		free(store); free(path);
+		return rc;
+	}
+	free(wpw); free(ssid);
+
+	/* mfa: seed at <entry>/secret (standalone) or <entry>/mfa/secret. */
+	char *base = xstrdup(path);
+	char *seed = qr_field(s, store, base, "secret");
+	if (!seed) { free(base); base = xasprintf("%s/mfa", path); seed = qr_field(s, store, base, "secret"); }
+	if (seed) {
+		char *issuer  = qr_field(s, store, base, "issuer");
+		char *account = qr_field(s, store, base, "account");
+		char *algo    = qr_field(s, store, base, "algorithm");
+		char *digits  = qr_field(s, store, base, "digits");
+		char *period  = qr_field(s, store, base, "period");
+		char *label   = pct_encode(account ? account : "secret");
+		char *ienc    = issuer ? pct_encode(issuer) : NULL;
+		/* upper-case the algorithm for the otpauth URI */
+		char  algup[8] = "SHA1";
+		if (algo) { size_t i; for (i = 0; i < sizeof(algup)-1 && algo[i]; i++) algup[i] = (char)toupper((unsigned char)algo[i]); algup[i] = '\0'; }
+		char *uri = xasprintf(
+			"otpauth://totp/%s?secret=%s&algorithm=%s&digits=%s&period=%s%s%s",
+			label, seed, algup, digits ? digits : "6", period ? period : "30",
+			ienc ? "&issuer=" : "", ienc ? ienc : "");
+		rc = qr_emit(uri, strlen(uri));
+		free(uri); free(ienc); free(label); free(period); free(digits);
+		free(algo); free(account); free(issuer); free(seed); free(base);
+		free(store); free(path);
+		return rc;
+	}
+	free(seed); free(base);
+
+	/* Plain parameter: encode its raw value. */
 	char  *plain = NULL;
 	size_t plen = 0;
-	if (store_get_value(s, store, param, &plain, &plen) == 0) {
-		char *qr[] = { "qrencode", "-t", "utf8", NULL };
-		rc = proc_run(qr, NULL, plain, plen, NULL, NULL, 0);
+	if (store_get_value(s, store, path, &plain, &plen) == 0) {
+		rc = qr_emit(plain, plen);
 		free(plain);
 	}
-	free(store); free(param);
+	free(store); free(path);
 	return rc;
 }
 

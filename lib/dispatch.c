@@ -50,6 +50,7 @@ static const struct {
 	{ "templates",   cmd_templates   },
 	{ "new",         cmd_new         },
 	{ "otp",         cmd_otp         },
+	{ "clip",        cmd_clip        },
 	{ NULL,          NULL            },
 };
 

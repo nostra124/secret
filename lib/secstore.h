@@ -115,6 +115,8 @@ int cmd_templates(secstore_t *s, int argc, char **argv);   /* template.c */
 int cmd_new      (secstore_t *s, int argc, char **argv);
 int cmd_otp      (secstore_t *s, int argc, char **argv);
 
+int cmd_clip     (secstore_t *s, int argc, char **argv);   /* clip.c */
+
 #ifdef __cplusplus
 }
 #endif

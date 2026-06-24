@@ -21,8 +21,11 @@
   `docs/sources.md`.
 - structured-entry **templates** (`login` / `wifi` / `mfa`
   / `passkey` / `wallet`) materialised one-param-per-field
-  by `secret new`, with `secret otp` for TOTP codes via
-  `oathtool`. See `docs/templates.md`.
+  by `secret new`, with template-bound actions duck-typed
+  on the fields: `secret qr` (WiFi join / `otpauth` codes),
+  `secret otp` (TOTP via `oathtool`, `-c` to clipboard) and
+  the general `secret clip` (clipboard with auto-clear). See
+  `docs/templates.md`.
 
 Out of scope: cryptography primitives separate from GPG,
 generic config file management.

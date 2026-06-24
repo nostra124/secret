@@ -196,8 +196,27 @@ runs `pass rm -f <param>`.
 
 #### `qr <store>/<param>`
 
-Decrypt and pipe through `qrencode -t utf8` for terminal display.
+QR-encode for terminal display (via `qrencode -t utf8`). Template-aware:
+- a **wifi** entry (has `ssid` + `password`) yields a scannable
+  `WIFI:T:…;S:…;P:…;H:…;;` join code;
+- an **mfa** entry (has `secret`, standalone or at `<entry>/mfa/secret`)
+  yields an `otpauth://totp/…` provisioning code;
+- otherwise the parameter's raw value is encoded.
+
 Requires `qrencode(1)`.
+
+#### `clip <store>/<param>`
+
+Copy a parameter's value to the system clipboard, then auto-clear it
+after a timeout (default 45s; `$SECRET_CLIP_TIME`, `0` disables). The
+backend is auto-detected — `wl-copy` (when `$WAYLAND_DISPLAY` is set),
+`xclip`/`xsel` (when `$DISPLAY` is set), `pbcopy`, or `clip.exe` — or
+overridden with `$SECRET_CLIP_CMD` (a shell command fed the value on
+stdin).
+
+```
+secret clip bitcoin/api:key
+```
 
 #### `gen <store>/<param>`
 
@@ -386,15 +405,17 @@ secret new wallet  coins/btc "mnemonic=word1 word2 …" derivation=m/84'/0'/0'
 secret new mfa     accounts/github --attach secret=JBSWY3DPEHPK3PXP
 ```
 
-#### `otp <store>/<entry>`
+#### `otp <store>/<entry> [-c]`
 
 Print the current TOTP code for an `mfa` entry, shelling out to
 `oathtool(1)`. The seed is read from `<entry>/secret` (standalone) or
 `<entry>/mfa/secret` (attached), honouring the entry's `algorithm`,
-`digits` and `period` fields.
+`digits` and `period` fields. With `-c` / `--clip`, copy the code to the
+clipboard (auto-clearing) instead of printing it.
 
 ```
-secret otp accounts/github
+secret otp accounts/github          # print
+secret otp accounts/github -c       # copy to clipboard
 ```
 
 ## Environment

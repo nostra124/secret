@@ -77,6 +77,34 @@ honours the entry's `algorithm` (`sha1`/`sha256`/`sha512`), `digits` and
 `period` fields. Requires `oathtool` on `$PATH` (Debian/Ubuntu:
 `oathtool`).
 
+## Template-bound functionality
+
+Built-in templates come with behaviour, not just fields. The action verbs
+are *duck-typed* on the entry's fields (no marker is stored), so they work
+on any entry that has the right fields — including ones you build by hand
+or with a custom template.
+
+| Verb | Applies to | Behaviour |
+|---|---|---|
+| `secret qr <store>/<entry>` | wifi entry (`ssid`+`password`) | scannable `WIFI:` join code |
+| `secret qr <store>/<entry>` | mfa entry (`secret`) | `otpauth://totp/…` provisioning code |
+| `secret otp <store>/<entry> [-c]` | mfa entry | current TOTP code (print, or `-c` to clipboard) |
+| `secret clip <store>/<param>` | any parameter | copy to clipboard, auto-clearing |
+
+```
+secret new wifi net/home ssid=HomeNet password=hunter2 security=wpa3
+secret qr  net/home                 # phone scans this to join the network
+
+secret new mfa accounts/gh secret=JBSWY3DPEHPK3PXP issuer=GitHub account=octo
+secret otp accounts/gh              # 292621
+secret otp accounts/gh -c           # copy the code (auto-clears)
+secret qr  accounts/gh              # otpauth:// QR to provision an authenticator
+```
+
+The clipboard (`clip`, `otp -c`) auto-clears after `$SECRET_CLIP_TIME`
+seconds (default 45); the backend is auto-detected (`wl-copy`/`xclip`/
+`xsel`/`pbcopy`/`clip.exe`) or set via `$SECRET_CLIP_CMD`.
+
 ## Passkeys
 
 The `passkey` template is a **backup/transport** schema for software

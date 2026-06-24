@@ -252,13 +252,22 @@ int cmd_new(secstore_t *s, int argc, char **argv)
 
 int cmd_otp(secstore_t *s, int argc, char **argv)
 {
-	if (argc < 1 || !argv[0] || !*argv[0])
+	/* Accept `-c`/`--clip` anywhere; the entry is the first positional. */
+	int clip = 0;
+	const char *arg = NULL;
+	for (int i = 0; i < argc; i++) {
+		if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--clip"))
+			clip = 1;
+		else if (!arg)
+			arg = argv[i];
+	}
+	if (!arg || !*arg)
 		secstore_fatal(s, "please specify in the format <store>/<entry>");
 	if (!have_tool("oathtool"))
 		secstore_fatal(s, "oathtool(1) missing — install your distro's 'oathtool' package");
 
 	char *store = NULL, *entry = NULL;
-	parse_param(s, argv[0], 1, &store, &entry);
+	parse_param(s, arg, 1, &store, &entry);
 
 	/* The mfa secret lives at <entry>/secret (standalone) or
 	 * <entry>/mfa/secret (attached to a base entry). */
@@ -285,8 +294,15 @@ int cmd_otp(secstore_t *s, int argc, char **argv)
 	char  *out = NULL;
 	size_t olen = 0;
 	int rc = proc_run(oa, NULL, NULL, 0, &out, &olen, 0);
-	if (rc == 0 && out)
-		fputs(out, stdout);
+	if (rc == 0 && out) {
+		if (clip) {
+			size_t n = olen;
+			while (n > 0 && (out[n-1] == '\n' || out[n-1] == '\r')) n--;
+			secstore_clip(s, out, n);
+		} else {
+			fputs(out, stdout);
+		}
+	}
 
 	free(out); free(step); free(dig); free(totp);
 	free(period); free(digits); free(algo);

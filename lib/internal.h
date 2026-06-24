@@ -176,6 +176,11 @@ int store_set_value(secstore_t *s, const char *store, const char *param,
 char          *b64_encode(const unsigned char *data, size_t len);
 unsigned char *b64_decode(const char *text, size_t *out_len);
 
+/* ---- clipboard (clip.c) -------------------------------------------- */
+/* Copy data to the system clipboard, scheduling an auto-clear. Fatal if
+ * no clipboard backend is available. */
+void secstore_clip(secstore_t *s, const char *data, size_t len);
+
 /* ---- parameter parsing (param.c / store.c shared) ------------------ */
 
 /* Parse a raw "<store>/<param>" (or "<store>:<a>:<b>") argument the way
