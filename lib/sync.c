@@ -27,7 +27,7 @@ int git_quiet(secstore_t *s, const char *cwd, ...)
 		argv[a++] = arg;
 	va_end(ap);
 	argv[a] = NULL;
-	return proc_run(argv, cwd, NULL, 0, NULL, NULL, 1);
+	return proc_run_quiet(argv, cwd);
 }
 
 /* Capture a store's git remotes into out (one per line). */
@@ -97,7 +97,7 @@ static int has_remote(const char *cwd, const char *account)
 static int remote_store_exists(secstore_t *s, const char *account, const char *store)
 {
 	char *ssh[] = { "ssh", (char *)account, s->self, "exists", (char *)store, NULL };
-	return proc_run(ssh, NULL, NULL, 0, NULL, NULL, 1) == 0;
+	return proc_run_quiet(ssh, NULL) == 0;
 }
 
 int cmd_pull(secstore_t *s, int argc, char **argv)

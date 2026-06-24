@@ -135,7 +135,7 @@ void gpg_import_public_key(secstore_t *s, const char *key,
 	}
 
 	char *import[] = { "gpg", "--import", pub, NULL };
-	proc_run(import, NULL, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(import, NULL);
 
 	strlist fprs;
 	strlist_init(&fprs);
@@ -144,7 +144,7 @@ void gpg_import_public_key(secstore_t *s, const char *key,
 		char *sign[] = {
 			"gpg", "--no-tty", "--quick-sign-key", fprs.items[i], NULL
 		};
-		proc_run(sign, NULL, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(sign, NULL);
 	}
 	strlist_free(&fprs);
 

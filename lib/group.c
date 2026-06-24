@@ -206,10 +206,10 @@ static void pull_one(secstore_t *s, const char *base, const char *store)
 			char *save = NULL;
 			for (char *fn = strtok_r(names, "\n", &save); fn; fn = strtok_r(NULL, "\n", &save)) {
 				char *co[] = { "git", "checkout", "--theirs", fn, NULL };
-				proc_run(co, dir, NULL, 0, NULL, NULL, 1);
+				proc_run_quiet(co, dir);
 			}
 			char *ci[] = { "git", "commit", "-a", "-m", "resolved merging conflicts", NULL };
-			proc_run(ci, dir, NULL, 0, NULL, NULL, 1);
+			proc_run_quiet(ci, dir);
 		}
 		free(names);
 		free(branch);

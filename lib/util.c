@@ -18,14 +18,14 @@
 
 void *xmalloc(size_t n)
 {
-	void *p = malloc(n ? n : 1);
+	void *p = SECRET_FAULT("malloc") ? NULL : malloc(n ? n : 1);
 	if (!p) { fprintf(stderr, "secret: fatal - out of memory\n"); exit(1); }
 	return p;
 }
 
 void *xrealloc(void *p, size_t n)
 {
-	void *q = realloc(p, n ? n : 1);
+	void *q = SECRET_FAULT("realloc") ? NULL : realloc(p, n ? n : 1);
 	if (!q) { fprintf(stderr, "secret: fatal - out of memory\n"); exit(1); }
 	return q;
 }

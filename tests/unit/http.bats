@@ -161,3 +161,20 @@ teardown() {
 	[ "$output" = "s3cr3t-token" ]
 	rm -rf "$A" "$B"
 }
+
+@test "serve rejects non-GET and out-of-tree requests (SIT)" {
+	[ -n "$SECRET_SIT" ] || skip "set SECRET_SIT=1 to run"
+	command -v curl >/dev/null || skip "curl not installed"
+	port=48766
+	SECRET_HTTP_PORT="$port" SELF_QUIET=1 "$SECRET_BIN" serve >/dev/null 2>&1 &
+	serve_pid=$!
+	sleep 1
+	post=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+	       "http://127.0.0.1:$port/app/secret/x/info/refs")
+	outside=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/elsewhere")
+	missing=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/app/secret/x/nope")
+	kill "$serve_pid" 2>/dev/null      # SIGTERM -> graceful shutdown
+	[ "$post" = "405" ]
+	[ "$outside" = "404" ]
+	[ "$missing" = "404" ]
+}
