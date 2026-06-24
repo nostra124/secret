@@ -67,6 +67,21 @@ static int init_one_store(secstore_t *s, const char *store)
 	}
 	free(toplevel);
 
+	/* Configure a per-repo git identity from the secret identity so
+	 * commits succeed without relying on a global git config — otherwise
+	 * `git commit` fails silently and the store has no history to sync
+	 * (over SSH or HTTP). */
+	{
+		char *gid = secstore_identity(s);
+		if (gid) {
+			char *ce[] = { "git", "config", "user.email", gid, NULL };
+			char *cn[] = { "git", "config", "user.name",  gid, NULL };
+			proc_run(ce, dir, NULL, 0, NULL, NULL, 1);
+			proc_run(cn, dir, NULL, 0, NULL, NULL, 1);
+			free(gid);
+		}
+	}
+
 	/* Recipient public keys: export ours, import all present. */
 	char *gpgdir = path_join(dir, ".gpg");
 	mkdir_p(gpgdir);

@@ -14,6 +14,10 @@
 - the `pass(1)` password-store integration
   (`pass-init` per FEAT-041)
 - git-backed sync of stores between peers via SSH
+  (push + pull) and **pull-only over HTTP** from named
+  **groups** of endpoints (`serve` exposes stores at
+  `/app/secret/<store>` on a uid-derived port). See
+  `docs/sharing.md`.
 - import/export to other secret stores ("sources") via a
   provider plugin system — built-in `keyring` (GNOME /
   freedesktop Secret Service, through `secret-tool`) plus
@@ -80,6 +84,14 @@ The structured-entry template system lives in
 templates are pure schemas (no on-disk binding) that
 `new` expands into one parameter per field. See
 `docs/templates.md`.
+
+HTTP sharing lives in `lib/http.c` (the `serve` HTTP
+pull server + uid-derived `port`) and `lib/group.c`
+(`groups` / `group-add` / `group-del` / `pull-http`).
+`init` configures a per-repo git `user.name`/`user.email`
+from the identity so commits land (and stores stay
+syncable) without a global git config. See
+`docs/sharing.md`.
 
 Logging: four levels (`debug` / `info` / `warn` /
 `error`) plus a `fatal` convenience (= error + exit).

@@ -347,7 +347,9 @@ void list_subdirs(const char *dir, strlist *out)
 		return;
 	struct dirent *e;
 	while ((e = readdir(d))) {
-		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+		/* Skip "." / ".." and any hidden entry (e.g. the .groups
+		 * config dir) — stores are never dot-named. */
+		if (e->d_name[0] == '.')
 			continue;
 		char *full = path_join(dir, e->d_name);
 		if (is_dir(full))
