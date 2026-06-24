@@ -58,10 +58,15 @@ source provider additionally shells out to `secret-tool(1)`
 
 The import/export source providers live in `lib/source.c`
 (registry + external-plugin bridge), `lib/source_keyring.c`
-(the built-in keyring provider) and `lib/transfer.c` (the
+(the built-in keyring provider, incl. foreign-item import
+via `--query`) and `lib/transfer.c` (the
 `import`/`export`/`sources` verbs). The provider contract
 and the external `secret-source-<name>` plugin protocol are
-specified in `docs/sources.md`.
+specified in `docs/sources.md`. Bundled external plugins
+ship under `libexec/secret/sources/` — currently
+`secret-source-keepass` (Python + `pykeepass`, for KeePass
+`.kdbx` files); the binary discovers them at
+`<exe>/../libexec/secret/sources/` and on `$PATH`.
 
 Logging: four levels (`debug` / `info` / `warn` /
 `error`) plus a `fatal` convenience (= error + exit).

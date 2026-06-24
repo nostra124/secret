@@ -42,8 +42,6 @@ static int exec_available(secstore_t *s, const secret_source *self)
 static int exec_do_export(secstore_t *s, const secret_source *self,
                           const char *store, int argc, char **argv_extra)
 {
-	(void)argc; (void)argv_extra;
-
 	/* Build the param<TAB>base64(value) stream for the whole store. */
 	strlist params;
 	strlist_init(&params);
@@ -72,8 +70,18 @@ static int exec_do_export(secstore_t *s, const secret_source *self,
 	}
 	strlist_free(&params);
 
-	char *argv[] = { self->path, "export", (char *)store, NULL };
+	/* argv: <plugin> export <store> [extra args forwarded verbatim] */
+	char **argv = xmalloc((size_t)(argc + 4) * sizeof(*argv));
+	int a = 0;
+	argv[a++] = self->path;
+	argv[a++] = "export";
+	argv[a++] = (char *)store;
+	for (int i = 0; i < argc; i++)
+		argv[a++] = argv_extra[i];
+	argv[a] = NULL;
+
 	int rc = proc_run(argv, NULL, buf, len, NULL, NULL, 0);
+	free(argv);
 	free(buf);
 	return rc;
 }
@@ -81,12 +89,20 @@ static int exec_do_export(secstore_t *s, const secret_source *self,
 static int exec_do_import(secstore_t *s, const secret_source *self,
                           const char *store, int argc, char **argv_extra)
 {
-	(void)argc; (void)argv_extra;
+	char **argv = xmalloc((size_t)(argc + 4) * sizeof(*argv));
+	int a = 0;
+	argv[a++] = self->path;
+	argv[a++] = "import";
+	argv[a++] = (char *)store;
+	for (int i = 0; i < argc; i++)
+		argv[a++] = argv_extra[i];
+	argv[a] = NULL;
 
 	char  *out = NULL;
 	size_t olen = 0;
-	char *argv[] = { self->path, "import", (char *)store, NULL };
-	if (proc_run(argv, NULL, NULL, 0, &out, &olen, 0) != 0 || !out) {
+	int spawn = proc_run(argv, NULL, NULL, 0, &out, &olen, 0);
+	free(argv);
+	if (spawn != 0 || !out) {
 		free(out);
 		return 1;
 	}

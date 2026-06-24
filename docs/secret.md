@@ -322,19 +322,50 @@ parameter becomes a Secret Service item with attributes
 secret export keyring bitcoin
 ```
 
-#### `import <source> <store>`
+#### `import <source> <store> [options]`
 
 Pull `source`'s items for `store` back into the (already-existing) store,
-encrypting each to the store's recipients. For `keyring`, only items in
-`secret`'s own namespace (matching the label/attributes above) are
-imported.
+encrypting each to the store's recipients.
 
 ```
 secret import keyring bitcoin
 ```
 
+For `keyring`, the default imports only items in `secret`'s own namespace
+(the label/attributes above). To pull **foreign** items (stored by other
+applications), select them by attribute:
+
+```
+secret import keyring personal --query application=org.gnome.Epiphany
+secret import keyring personal --query app=mybrowser --prefix imported
+```
+
+- `--query attr=value` — repeatable; ANDed together (passed to
+  `secret-tool search --all`).
+- `--prefix p` — namespace the imported parameters under `p/`.
+
+Each foreign item's label is sanitised into a parameter id (lowercased,
+unsafe characters collapsed to `-`). Multiline values are reconstructed
+from the `secret-tool` output.
+
 `<store>` must already exist (run `secret init <store>` first); `..`
 segments are rejected as for every other store argument (FEAT-207).
+Options after `<store>` are forwarded to the provider, so external
+plugins can take their own flags (e.g. the `keepass` plugin's
+`--db PATH`).
+
+##### KeePass (`keepass`)
+
+A bundled external plugin (`secret-source-keepass`) bridges to a KeePass
+`.kdbx` database via the pure-Python `pykeepass` library (no KeePassXC /
+Qt needed). Each store maps to a KeePass group, each parameter to an
+entry (title = parameter id, password field = value).
+
+```
+export KEEPASS_DB=~/secrets.kdbx KEEPASS_PASSWORD=…   # or --db / --keyfile
+secret export keepass bitcoin
+secret import keepass bitcoin
+```
 
 #### External source plugins
 

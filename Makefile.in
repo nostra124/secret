@@ -84,6 +84,7 @@ prefix      ?= /usr/local
 exec_prefix ?= $(prefix)
 bindir      ?= $(exec_prefix)/bin
 libdir      ?= $(exec_prefix)/lib
+libexecdir  ?= $(exec_prefix)/libexec
 includedir  ?= $(prefix)/include
 sysconfdir  ?= /etc
 datarootdir ?= $(prefix)/share
@@ -95,7 +96,8 @@ install-dist: all
 	$(INSTALL) -d $(DESTDIR)$(bindir) $(DESTDIR)$(libdir) \
 	    $(DESTDIR)$(includedir) $(DESTDIR)$(mandir)/man1 \
 	    $(DESTDIR)$(sysconfdir)/bash_completion.d \
-	    $(DESTDIR)$(datarootdir)/$(pkgname) $(DESTDIR)$(docdir)
+	    $(DESTDIR)$(datarootdir)/$(pkgname) $(DESTDIR)$(docdir) \
+	    $(DESTDIR)$(libexecdir)/$(pkgname)/sources
 	$(INSTALL) -m 0755 bin/secret      $(DESTDIR)$(bindir)/secret
 	$(INSTALL) -m 0755 $(SHLIB)        $(DESTDIR)$(libdir)/$(SHLIB)
 	$(INSTALL) -m 0644 $(ARLIB)        $(DESTDIR)$(libdir)/$(ARLIB)
@@ -107,6 +109,14 @@ install-dist: all
 	$(INSTALL) -m 0644 VERSION         $(DESTDIR)$(datarootdir)/$(pkgname)/version
 	$(INSTALL) -m 0644 docs/secret.md  $(DESTDIR)$(docdir)/secret.md
 	$(INSTALL) -m 0644 Readme.md       $(DESTDIR)$(docdir)/README.md
+	# External source plugins (secret-source-*) under libexec.
+	@if [ -d libexec/$(pkgname)/sources ]; then \
+	  for p in libexec/$(pkgname)/sources/*; do \
+	    [ -f "$$p" ] || continue; \
+	    echo "$(INSTALL) -m 0755 $$p $(DESTDIR)$(libexecdir)/$(pkgname)/sources/"; \
+	    $(INSTALL) -m 0755 "$$p" "$(DESTDIR)$(libexecdir)/$(pkgname)/sources/"; \
+	  done; \
+	fi
 
 # ---- native packages ------------------------------------------------
 # Each recipe stages via `install-dist` then wraps with the platform's
