@@ -75,6 +75,11 @@ static void print_general(secstore_t *s)
 "   sources                       list import/export sources and availability\n"
 "   export <source> <store>       push a store's parameters to <source>\n"
 "   import <source> <store>       pull <source>'s items into <store>\n"
+"\n"
+"template commands\n"
+"   templates [name]              list entry templates, or show one's fields\n"
+"   new <template> <store>/<name> create a structured entry from a template\n"
+"   otp <store>/<name>            print the current TOTP code for an mfa entry\n"
 "\n",
 		self, self, self, self, self);
 }

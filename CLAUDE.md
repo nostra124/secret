@@ -19,6 +19,10 @@
   freedesktop Secret Service, through `secret-tool`) plus
   external `secret-source-<name>` plugins. See
   `docs/sources.md`.
+- structured-entry **templates** (`login` / `wifi` / `mfa`
+  / `passkey` / `wallet`) materialised one-param-per-field
+  by `secret new`, with `secret otp` for TOTP codes via
+  `oathtool`. See `docs/templates.md`.
 
 Out of scope: cryptography primitives separate from GPG,
 generic config file management.
@@ -62,6 +66,12 @@ The import/export source providers live in `lib/source.c`
 `import`/`export`/`sources` verbs). The provider contract
 and the external `secret-source-<name>` plugin protocol are
 specified in `docs/sources.md`.
+
+The structured-entry template system lives in
+`lib/template.c` (the `templates` / `new` / `otp` verbs);
+templates are pure schemas (no on-disk binding) that
+`new` expands into one parameter per field. See
+`docs/templates.md`.
 
 Logging: four levels (`debug` / `info` / `warn` /
 `error`) plus a `fatal` convenience (= error + exit).
