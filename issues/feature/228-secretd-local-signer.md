@@ -32,6 +32,11 @@ only** — never a TCP port, never remote.
    authorised and revoked independently of the CLI.
 3. `secret` CLI verbs transparently use `secretd` when its socket is
    present, else run inline (same code path via the embedded core).
+4. The RPC defined here **is** the `libsecretc`/`libsecretd` boundary
+   (FEAT-231): `secretd` (engine, `libsecretd`) serves it; clients link
+   the thin `libsecretc` to speak it. Specify the wire format (framing,
+   handshake/token, request/response encoding) as a documented contract
+   both libraries implement.
 
 ## Deferred sub-decisions (resolve in this issue)
 

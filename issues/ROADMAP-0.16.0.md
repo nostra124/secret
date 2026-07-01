@@ -16,14 +16,28 @@ status: planned
 
 ## The redesign, in one paragraph
 
-The signer core lives in `libsecstore` (C, linking **OpenSSL libcrypto**
-+ **libsecp256k1**) so it is reachable three ways: **inline** by the CLI,
+The signer core lives in the engine library **`libsecretd`** (today's
+`libsecstore`, renamed — C, linking **OpenSSL libcrypto** +
+**libsecp256k1**) so it is reachable three ways: **inline** by the CLI,
 **embedded** by the mobile apps (local stores, no daemon), and over an
-**authenticated Unix socket** by `secretd`'s local clients (the CLI and a
-browser-extension bridge). The only network surface is **secretd ↔
-secretd store sync over mTLS** — encrypted git repos replicate between
-your own daemons, mutually authenticated by pinned (TOFU) certs. Remote
-*signing* does not exist: signatures over plaintext never leave the box.
+**authenticated Unix socket** by `secretd`'s local clients. Those clients
+link the thin **`libsecretc`** client library — no crypto, just the RPC
+to `secretd` — for easy consumption and bindings. The only network
+surface is **secretd ↔ secretd store sync over mTLS** — encrypted git
+repos replicate between your own daemons, mutually authenticated by
+pinned (TOFU) certs. Remote *signing* does not exist: signatures over
+plaintext never leave the box.
+
+### Library architecture (FEAT-231)
+
+- **`libsecretd`** (engine + daemon) — store lifecycle, signer core,
+  socket serving/auth, mTLS sync. Heavy deps. Linked by `secretd`, the
+  CLI (inline), and mobile (embedded, in-process).
+- **`libsecretc`** (client) — RPC to `secretd` over the Unix socket;
+  no crypto, minimal deps, stable C ABI for bindings. Linked by
+  consumer apps, the browser bridge, and the CLI (client mode).
+- The **wire protocol** is the contract between them, defined in
+  FEAT-228 and implemented by both ends.
 
 ## Locked decisions (design round, 2026-07-01)
 
@@ -43,8 +57,17 @@ Two sub-decisions are deliberately deferred to **before FEAT-228**:
 **approval model** (per-request prompt vs per-origin allowlist vs both)
 and **unlock model** (gpg-agent re-decrypt per op vs session-held seed).
 
+Naming note: `libsecstore` was named to avoid the GNOME/freedesktop
+**libsecret** collision (CLAUDE.md §4). `libsecretd`/`libsecretc` sit
+next to that name; the `-lsecretd`/`-lsecretc` sonames disambiguate at
+link time. Names are provisional — trivially renamed while this is
+docs-only.
+
 ## 0.16.0 — crypto foundation & Nostr
 
+- **FEAT-231** — split the library: rename `libsecstore` → **`libsecretd`**
+  (engine/daemon) and add **`libsecretc`** (thin RPC client). The rename
+  half lands here; the client half completes alongside FEAT-228.
 - **FEAT-224** — crypto foundation: link OpenSSL + libsecp256k1;
   BIP-39 mnemonic→seed, BIP-32 HD derivation, bech32/base58 encoding;
   `secret derive`; extend the `wallet` template; amend CLAUDE.md scope.

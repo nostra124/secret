@@ -33,6 +33,10 @@ includes the doc amendment so policy and code agree.
 1. Build: link **OpenSSL libcrypto** and **libsecp256k1**; add
    `configure` probes with a clear error if headers/libs are missing;
    add both as runtime deps in every `packaging/*` manifest.
+   The library that gains these deps is the engine library — renamed
+   `libsecstore` → `libsecretd` per FEAT-231 (do the rename first if it
+   has landed, else write new files under the current name and let
+   FEAT-231 carry the move).
 2. Derivation engine (new `lib/wallet.c` + `lib/bip.c`):
    - BIP-39 mnemonic + optional passphrase → seed (PBKDF2-HMAC-SHA512,
      2048 iterations) via libcrypto.
