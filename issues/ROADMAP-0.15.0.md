@@ -38,13 +38,18 @@ Land #14 first, then:
   registry/mirrors are reachable (recipes are ready; the sandbox TLS
   proxy blocked them).
 
-## 0.16.0 — sharing & source depth
+## 0.16.0+ — signing & identity
 
-- **FEAT-219** — user-defined named templates (`secret new <custom>`).
-- **FEAT-220** — HTTPS-native + optional auth for `serve`; peer discovery
-  (mDNS) so groups self-populate.
-- **FEAT-221** — more source providers (1Password / Bitwarden CLI, `.env`
-  files, cloud KMS) as external `secret-source-*` plugins.
+The next arc is the **signing & identity** theme — native crypto, Nostr
+(NIP-06/07/98), BIP-322 sign-in, the `secretd` local signer, and mTLS
+peer sync. It has its own backlog: see **`ROADMAP-0.16.0.md`**
+(FEAT-224 … FEAT-230). Notes on the earlier sketch:
+
+- **FEAT-220** (HTTPS + auth for `serve`, mDNS discovery) is
+  **superseded** by **FEAT-229** — the HTTP-sharing surface is retired
+  in favour of mTLS secretd↔secretd sync.
+- **FEAT-219** (user templates) and **FEAT-221** (more source providers)
+  remain valid and independent; they ride a later release.
 
 ## 1.0.0 — integrity & polish
 
