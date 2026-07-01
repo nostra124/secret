@@ -28,10 +28,13 @@ Latest tagged release: **0.14.4**.
 
 ## 0.15.0 — correctness & test hardening
 
-Land #14 first, then:
+#14 landed. Then:
 
-- **BUG-216** — `password-store` `set`/`get` do not round-trip (legacy
-  pass-insert entry-naming carried verbatim from the shell version).
+- ~~**BUG-216** — `password-store` `set`/`get` do not round-trip~~
+  **(resolved)** — two bugs: `pass insert` was handed the commit message
+  as its entry name, and `pass-init`'s `reset --hard` wiped `.gpg-id`
+  because pass's internal commit had no git identity. See
+  `issues/done/bug/216-password-store-set-roundtrip.md`.
 - **FEAT-217** — raise coverage to ~95%+ and run the SIT suite in CI
   (install the tools) with a `SECRET_COV_MIN` gate.
 - **FEAT-218** — run the rpm/apk PIT legs on a runner whose container

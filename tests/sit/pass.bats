@@ -81,6 +81,26 @@ teardown() {
 	[ -n "${status+x}" ]
 }
 
+@test "set then get round-trips a value over password-store (BUG-216)" {
+	"$SECRET_BIN" -q pass-init
+	printf 's3cr3t-token' | "$SECRET_BIN" -q set password-store/email:work
+	run "$SECRET_BIN" -q get password-store/email:work
+	[ "$status" -eq 0 ]
+	[ "$output" = "s3cr3t-token" ]
+	# the entry must live under the parameter name pass(1) itself uses,
+	# so `pass show` and `secret get` agree (interoperability).
+	run pass show email/work
+	[ "$output" = "s3cr3t-token" ]
+}
+
+@test "set is idempotent over password-store (overwrite, BUG-216)" {
+	"$SECRET_BIN" -q pass-init
+	printf 'first'  | "$SECRET_BIN" -q set password-store/api:key
+	printf 'second' | "$SECRET_BIN" -q set password-store/api:key
+	run "$SECRET_BIN" -q get password-store/api:key
+	[ "$output" = "second" ]
+}
+
 @test "set / del-gpg-key / add-gpg-key over password-store run" {
 	"$SECRET_BIN" -q pass-init
 	# the password-store set path (the legacy pass-insert behaviour)

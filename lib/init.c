@@ -47,6 +47,42 @@ static char *ensure_identity(secstore_t *s)
 	return id;
 }
 
+/* Bring the pass(1) password store under git with a per-repo identity.
+ *
+ * pass(1) commits every change through its own internal git, which fails
+ * silently when no git identity is configured (no global git config in a
+ * fresh container / CI). `pass init` writes .gpg-id but the follow-up
+ * `pass git init` then cannot commit it, and the legacy `pass git reset
+ * --hard` wiped the uncommitted .gpg-id — leaving the store unusable so
+ * `set`/`get` could never round-trip (BUG-216). Configuring the identity
+ * and committing .gpg-id ourselves (instead of the destructive reset)
+ * makes the store usable and keeps pass's later commits working. */
+static void pass_store_git_setup(secstore_t *s, const char *id)
+{
+	char *dir = store_dir(s, "password-store");
+
+	char *gi[] = { "git", "init", NULL };
+	proc_run_quiet(gi, dir);
+
+	if (id && *id) {
+		char *ce[] = { "git", "config", "user.email", (char *)id, NULL };
+		char *cn[] = { "git", "config", "user.name",  (char *)id, NULL };
+		proc_run_quiet(ce, dir);
+		proc_run_quiet(cn, dir);
+	}
+
+	char *cfg[] = { "git", "config", "--add",
+	                "receive.denyCurrentBranch", "ignore", NULL };
+	proc_run_quiet(cfg, dir);
+
+	char *add[]    = { "git", "add", "-A", NULL };
+	char *commit[] = { "git", "commit", "-m", "initialized password store", NULL };
+	proc_run_quiet(add, dir);
+	proc_run_quiet(commit, dir);
+
+	free(dir);
+}
+
 static int init_one_store(secstore_t *s, const char *store)
 {
 	char *dir = path_join(s->self_config, store);
@@ -202,13 +238,7 @@ int cmd_init(secstore_t *s, int argc, char **argv)
 			free(pi);
 		}
 		strlist_free(&fprs);
-		char *gi[] = { "pass", "git", "init", NULL };
-		proc_run_quiet(gi, NULL);
-		char *cfg[] = { "pass", "git", "config", "--add",
-		                "receive.denyCurrentBranch", "ignore", NULL };
-		proc_run_quiet(cfg, NULL);
-		char *reset[] = { "pass", "git", "reset", "--hard", NULL };
-		proc_run_quiet(reset, NULL);
+		pass_store_git_setup(s, id);
 		free(id);
 		free(store);
 		return 0;
@@ -267,13 +297,7 @@ int cmd_pass_init(secstore_t *s, int argc, char **argv)
 	free(pi);
 	strlist_free(&fprs);
 
-	char *gi[] = { "pass", "git", "init", NULL };
-	proc_run_quiet(gi, NULL);
-	char *cfg[] = { "pass", "git", "config", "--add",
-	                "receive.denyCurrentBranch", "ignore", NULL };
-	proc_run_quiet(cfg, NULL);
-	char *reset[] = { "pass", "git", "reset", "--hard", NULL };
-	proc_run_quiet(reset, NULL);
+	pass_store_git_setup(s, id);
 
 	free(id);
 	return 0;
