@@ -66,13 +66,13 @@ int account_online(secstore_t *s, const char *account)
 	int reachable = 0;
 	if (have_tool("fping")) {
 		char *fp[] = { "fping", "-4", "-q", (char *)host, NULL };
-		if (proc_run(fp, NULL, NULL, 0, NULL, NULL, 1) == 0) {
+		if (proc_run_quiet(fp, NULL) == 0) {
 			char *ssh[] = {
 				"ssh", "-o", "StrictHostKeyChecking=no",
 				"-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
 				"-o", "ConnectTimeout=5", acc, "true", NULL
 			};
-			if (proc_run(ssh, NULL, NULL, 0, NULL, NULL, 1) == 0)
+			if (proc_run_quiet(ssh, NULL) == 0)
 				reachable = 1;
 		}
 	}

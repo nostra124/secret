@@ -139,7 +139,7 @@ static void handle_conn(secstore_t *s, int fd)
 	if (strcmp(rest, "info/refs") == 0) {
 		char *sdir = path_join(s->self_config, store);
 		char *usi[] = { "git", "update-server-info", NULL };
-		proc_run(usi, sdir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(usi, sdir);
 		free(sdir);
 	}
 
@@ -149,16 +149,25 @@ static void handle_conn(secstore_t *s, int fd)
 	close(fd);
 }
 
+static volatile sig_atomic_t serve_stop = 0;
+static void serve_on_signal(int sig) { (void)sig; serve_stop = 1; }
+
 int cmd_serve(secstore_t *s, int argc, char **argv)
 {
 	(void)argc; (void)argv;
 	signal(SIGPIPE, SIG_IGN);
+	/* Stop cleanly on INT/TERM (no SA_RESTART, so accept() returns). */
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = serve_on_signal;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 
 	int port = secstore_http_port(s);
 	const char *bindaddr = getenv("SECRET_HTTP_BIND");
 	if (!bindaddr || !*bindaddr) bindaddr = "0.0.0.0";
 
-	int sock = socket(AF_INET, SOCK_STREAM, 0);
+	int sock = SECRET_FAULT("socket") ? -1 : socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0)
 		secstore_fatal(s, "socket: %s", strerror(errno));
 	int one = 1;
@@ -171,18 +180,18 @@ int cmd_serve(secstore_t *s, int argc, char **argv)
 	if (inet_pton(AF_INET, bindaddr, &addr.sin_addr) != 1)
 		addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+	if (SECRET_FAULT("bind") || bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
 		secstore_fatal(s, "bind %s:%d: %s", bindaddr, port, strerror(errno));
-	if (listen(sock, 16) != 0)
+	if (SECRET_FAULT("listen") || listen(sock, 16) != 0)
 		secstore_fatal(s, "listen: %s", strerror(errno));
 
 	secstore_info(s, "serving stores at http://%s:%d/app/secret/ (pull only; Ctrl-C to stop)",
 	              bindaddr, port);
 
-	for (;;) {
+	while (!serve_stop) {
 		int c = accept(sock, NULL, NULL);
 		if (c < 0) {
-			if (errno == EINTR) continue;
+			if (errno == EINTR) continue;   /* signal -> loop re-checks serve_stop */
 			break;
 		}
 		/* Sequential, one request per connection (Connection: close). */
@@ -191,6 +200,7 @@ int cmd_serve(secstore_t *s, int argc, char **argv)
 		handle_conn(s, c);
 	}
 	close(sock);
+	secstore_info(s, "stopped");
 	return 0;
 }
 

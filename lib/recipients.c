@@ -227,10 +227,10 @@ int cmd_add_gpg_key(secstore_t *s, int argc, char **argv)
 		if (f) { fputs(pubdata, f); fclose(f); }
 		char *relpub = xasprintf(".gpg/%s.pub", account);
 		char *add[] = { "git", "add", "-f", relpub, NULL };
-		proc_run(add, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(add, dir);
 		char *msg = xasprintf("added gpg-key %s", account);
 		char *commit[] = { "git", "commit", "-m", msg, "-a", NULL };
-		proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(commit, dir);
 		free(msg); free(relpub); free(pub); free(gpgdir);
 		free(pubdata); free(dir);
 		cmd_init(s, 1, (char *[]){ store });
@@ -261,10 +261,10 @@ int cmd_del_gpg_key(secstore_t *s, int argc, char **argv)
 			secstore_info(s, "removing gpg-key %s from store %s", account, store);
 			char *relpub = xasprintf(".gpg/%s.pub", account);
 			char *rm[] = { "git", "rm", "-f", relpub, NULL };
-			proc_run(rm, dir, NULL, 0, NULL, NULL, 1);
+			proc_run_quiet(rm, dir);
 			char *msg = xasprintf("removed gpg-key %s", account);
 			char *commit[] = { "git", "commit", "-m", msg, "-a", NULL };
-			proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+			proc_run_quiet(commit, dir);
 			free(msg); free(relpub);
 			cmd_init(s, 1, (char *[]){ store });
 		}

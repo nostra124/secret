@@ -36,7 +36,7 @@ static int exec_available(secstore_t *s, const secret_source *self)
 {
 	(void)s;
 	char *argv[] = { self->path, "available", NULL };
-	return proc_run(argv, NULL, NULL, 0, NULL, NULL, 1) == 0;
+	return proc_run_quiet(argv, NULL) == 0;
 }
 
 static int exec_do_export(secstore_t *s, const secret_source *self,

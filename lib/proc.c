@@ -16,6 +16,15 @@
 
 #include "internal.h"
 
+#ifdef SECRET_FAULTS
+/* Flush this (about-to-exec) process's coverage counters so the forked
+ * child's lines are observable by gcov. Coverage builds only. */
+extern void __gcov_dump(void);
+#define COV_FLUSH() __gcov_dump()
+#else
+#define COV_FLUSH() ((void)0)
+#endif
+
 int proc_run(char *const argv[], const char *cwd,
              const char *input, size_t input_len,
              char **out, size_t *out_len, int silence_stderr)
@@ -24,14 +33,14 @@ int proc_run(char *const argv[], const char *cwd,
 	int  out_pipe[2] = { -1, -1 };
 	pid_t pid;
 
-	if (input && pipe(in_pipe) != 0)
+	if (input && (SECRET_FAULT("pipe_in") || pipe(in_pipe) != 0))
 		return -1;
-	if (out && pipe(out_pipe) != 0) {
+	if (out && (SECRET_FAULT("pipe_out") || pipe(out_pipe) != 0)) {
 		if (input) { close(in_pipe[0]); close(in_pipe[1]); }
 		return -1;
 	}
 
-	pid = fork();
+	pid = SECRET_FAULT("fork") ? -1 : fork();
 	if (pid < 0) {
 		if (input)  { close(in_pipe[0]);  close(in_pipe[1]); }
 		if (out)    { close(out_pipe[0]); close(out_pipe[1]); }
@@ -59,6 +68,7 @@ int proc_run(char *const argv[], const char *cwd,
 				close(devnull);
 			}
 		}
+		COV_FLUSH();
 		execvp(argv[0], argv);
 		_exit(127);
 	}
@@ -113,14 +123,25 @@ int proc_run(char *const argv[], const char *cwd,
 	return -1;
 }
 
+int proc_run_quiet(char *const argv[], const char *cwd)
+{
+	/* Capture-and-discard stdout, silence stderr: for internal git/gpg
+	 * housekeeping whose chatter must not leak into command output. */
+	char *out = NULL;
+	int rc = proc_run(argv, cwd, NULL, 0, &out, NULL, 1);
+	free(out);
+	return rc;
+}
+
 int proc_run_tty(char *const argv[], const char *cwd)
 {
-	pid_t pid = fork();
+	pid_t pid = SECRET_FAULT("fork_tty") ? -1 : fork();
 	if (pid < 0)
 		return -1;
 	if (pid == 0) {
 		if (cwd && chdir(cwd) != 0)
 			_exit(127);
+		COV_FLUSH();
 		execvp(argv[0], argv);
 		_exit(127);
 	}

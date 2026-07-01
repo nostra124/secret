@@ -32,7 +32,7 @@ static char *ensure_identity(secstore_t *s)
 			"gpg", "--batch", "--passphrase", "", "--quick-generate-key",
 			id, "default", "default", NULL
 		};
-		proc_run(gen, NULL, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(gen, NULL);
 	}
 	strlist_free(&fprs);
 
@@ -58,12 +58,12 @@ static int init_one_store(secstore_t *s, const char *store)
 	char *rev[] = { "git", "rev-parse", "--show-toplevel", NULL };
 	if (proc_run(rev, dir, NULL, 0, &toplevel, &tl, 1) != 0) {
 		char *gi[] = { "git", "init", NULL };
-		proc_run(gi, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(gi, dir);
 		char *cfg[] = { "git", "config", "--add",
 		                "receive.denyCurrentBranch", "ignore", NULL };
-		proc_run(cfg, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(cfg, dir);
 		char *reset[] = { "git", "reset", "--hard", NULL };
-		proc_run(reset, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(reset, dir);
 	}
 	free(toplevel);
 
@@ -76,8 +76,8 @@ static int init_one_store(secstore_t *s, const char *store)
 		if (gid) {
 			char *ce[] = { "git", "config", "user.email", gid, NULL };
 			char *cn[] = { "git", "config", "user.name",  gid, NULL };
-			proc_run(ce, dir, NULL, 0, NULL, NULL, 1);
-			proc_run(cn, dir, NULL, 0, NULL, NULL, 1);
+			proc_run_quiet(ce, dir);
+			proc_run_quiet(cn, dir);
 			free(gid);
 		}
 	}
@@ -115,7 +115,7 @@ static int init_one_store(secstore_t *s, const char *store)
 		gpg_import_public_key(s, key, data, dl);
 		char *relpub = xasprintf(".gpg/%s", name);
 		char *add[] = { "git", "add", "-f", relpub, NULL };
-		proc_run(add, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(add, dir);
 		free(relpub); free(data); free(full); free(key);
 	}
 	strlist_free(&pubs);
@@ -153,11 +153,11 @@ static int init_one_store(secstore_t *s, const char *store)
 	strlist_free(&recips);
 
 	char *commit[] = { "git", "commit", "-a", "-m", "reinitialized secret", NULL };
-	proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(commit, dir);
 
 	if (s->euid == 0) {
 		char *ch[] = { "chmod", "-R", "u=rwX,go=rX", dir, NULL };
-		proc_run(ch, NULL, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(ch, NULL);
 	}
 
 	free(id);
@@ -203,12 +203,12 @@ int cmd_init(secstore_t *s, int argc, char **argv)
 		}
 		strlist_free(&fprs);
 		char *gi[] = { "pass", "git", "init", NULL };
-		proc_run(gi, NULL, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(gi, NULL);
 		char *cfg[] = { "pass", "git", "config", "--add",
 		                "receive.denyCurrentBranch", "ignore", NULL };
-		proc_run(cfg, NULL, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(cfg, NULL);
 		char *reset[] = { "pass", "git", "reset", "--hard", NULL };
-		proc_run(reset, NULL, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(reset, NULL);
 		free(id);
 		free(store);
 		return 0;
@@ -268,12 +268,12 @@ int cmd_pass_init(secstore_t *s, int argc, char **argv)
 	strlist_free(&fprs);
 
 	char *gi[] = { "pass", "git", "init", NULL };
-	proc_run(gi, NULL, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(gi, NULL);
 	char *cfg[] = { "pass", "git", "config", "--add",
 	                "receive.denyCurrentBranch", "ignore", NULL };
-	proc_run(cfg, NULL, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(cfg, NULL);
 	char *reset[] = { "pass", "git", "reset", "--hard", NULL };
-	proc_run(reset, NULL, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(reset, NULL);
 
 	free(id);
 	return 0;

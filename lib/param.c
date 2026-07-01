@@ -71,7 +71,7 @@ static void fix_perms(secstore_t *s, const char *dir)
 	if (s->euid != 0)
 		return;
 	char *chmod_d[] = { "chmod", "-R", "u=rwX,go=rX", (char *)dir, NULL };
-	proc_run(chmod_d, NULL, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(chmod_d, NULL);
 }
 
 /* Commit one parameter file inside its store. */
@@ -81,8 +81,8 @@ static void git_commit_param(secstore_t *s, const char *dir,
 	(void)s;
 	char *add[]    = { "git", "add", "-f", (char *)relfile, NULL };
 	char *commit[] = { "git", "commit", "-m", (char *)msg, (char *)relfile, NULL };
-	proc_run(add, dir, NULL, 0, NULL, NULL, 1);
-	proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+	proc_run_quiet(add, dir);
+	proc_run_quiet(commit, dir);
 }
 
 /* ---- core get / set (used by gen / def / qr / ins / rem) ----------- */
@@ -236,10 +236,10 @@ int cmd_del(secstore_t *s, int argc, char **argv)
 	char *file = path_join(dir, rel);
 	if (is_file(file)) {
 		char *rm[] = { "git", "rm", (char *)rel, NULL };
-		proc_run(rm, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(rm, dir);
 		char *msg = xasprintf("removed %s parameter %s", s->self, param);
 		char *commit[] = { "git", "commit", "-m", msg, (char *)rel, NULL };
-		proc_run(commit, dir, NULL, 0, NULL, NULL, 1);
+		proc_run_quiet(commit, dir);
 		free(msg);
 	}
 	free(file); free(rel); free(dir);
@@ -610,7 +610,7 @@ int cmd_edit(secstore_t *s, int argc, char **argv)
 	free(edited);
 
 	char *shred[] = { "shred", "-f", tmpl, NULL };
-	if (proc_run(shred, NULL, NULL, 0, NULL, NULL, 1) != 0)
+	if (proc_run_quiet(shred, NULL) != 0)
 		remove(tmpl);
 
 	free(dir);

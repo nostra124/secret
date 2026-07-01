@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 #include "secstore.h"
+#include "fault.h"
 
 /* ---- small string helpers (util.c) --------------------------------- */
 
@@ -71,6 +72,10 @@ int proc_run(char *const argv[], const char *cwd,
 /* Convenience: run argv inheriting the parent's stdio (interactive
  * tools such as $EDITOR), optionally chdir'ing first. */
 int proc_run_tty(char *const argv[], const char *cwd);
+
+/* Run argv discarding both stdout and stderr — for internal git/gpg
+ * housekeeping (init/commit/add/rm) whose output must not leak. */
+int proc_run_quiet(char *const argv[], const char *cwd);
 
 /* 1 if `name` is found on $PATH. */
 int have_tool(const char *name);

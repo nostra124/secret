@@ -44,7 +44,7 @@ ARLIB    := libsecstore.a
 .PHONY: all install install-dist uninstall check check-unit check-vectors \
         check-sit check-pit check-all lint test help package version clean \
         install-skills-user uninstall-skills-user \
-        install-hooks uninstall-hooks secret lib \
+        install-hooks uninstall-hooks secret lib coverage \
         package-deb package-rpm package-apk package-macos packages
 
 all: secret lib
@@ -201,25 +201,30 @@ check-vectors:
 		prove tests/vectors/*.t; \
 	else echo "prove or tests/vectors/ not present; skipping"; fi
 
+# SIT runs the host-tool integration suite (gpg/git/ssh/pass/keyring/...).
 check-sit:
-	@if ! command -v podman >/dev/null 2>&1; then \
-		echo "podman not installed; soft-skipping SIT"; \
-	elif [ -x tests/sit/run.sh ]; then \
+	@if [ -x tests/sit/run.sh ] && command -v bats >/dev/null 2>&1; then \
 		tests/sit/run.sh; \
 	else \
-		echo "tests/sit/run.sh not present; skipping"; \
+		echo "tests/sit/run.sh or bats absent; skipping SIT"; \
 	fi
 
+# PIT builds the native packages and installs them in clean distro
+# containers (docker or podman).
 check-pit:
-	@if ! command -v podman >/dev/null 2>&1; then \
-		echo "podman not installed; soft-skipping PIT"; \
-	elif [ -x tests/pit/run.sh ]; then \
+	@if [ -x tests/pit/run.sh ] && \
+	    { command -v docker >/dev/null 2>&1 || command -v podman >/dev/null 2>&1; }; then \
 		tests/pit/run.sh; \
 	else \
-		echo "tests/pit/run.sh not present; skipping"; \
+		echo "tests/pit/run.sh or docker/podman absent; skipping PIT"; \
 	fi
 
 check-all: check check-sit check-pit
+
+# Instrumented build + all runnable test layers + gcov line report.
+# SECRET_COV_MIN=NN make coverage  fails if total coverage is below NN.
+coverage:
+	@tests/coverage.sh
 
 # bin/secret is now a compiled C program (checked by the compiler's
 # -Wall -Wextra at build time); shellcheck only covers the remaining
