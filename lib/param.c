@@ -116,11 +116,13 @@ int store_set_value(secstore_t *s, const char *store, const char *param,
                      const char *value, size_t vlen)
 {
 	if (strcmp(store, "password-store") == 0) {
-		char *msg = xasprintf("set %s value %s", s->self, param);
-		char *pass[] = { "pass", "insert", "-m", msg, NULL };
-		int rc = proc_run(pass, NULL, value, vlen, NULL, NULL, 0);
-		free(msg);
-		return rc;
+		/* pass insert reads the value from stdin (-m/--multiline) and
+		 * stores it under the parameter name, overwriting any existing
+		 * entry (-f/--force) so `set` is idempotent. The entry name must
+		 * be `param` (not a commit message) so `pass show <param>` and
+		 * `secret get password-store/<param>` address the same file. */
+		char *pass[] = { "pass", "insert", "-m", "-f", (char *)param, NULL };
+		return proc_run(pass, NULL, value, vlen, NULL, NULL, 0);
 	}
 
 	char *dir = path_join(s->self_config, store);
