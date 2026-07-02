@@ -41,13 +41,13 @@ Land #14 first, then:
 ## 0.16.0+ — signing & identity
 
 The next arc is the **signing & identity** theme — native crypto, Nostr
-(NIP-06/07/98), BIP-322 sign-in, the `secretd` local signer, and mTLS
+(NIP-06/07/98), BIP-322 sign-in, the `secstored` local signer, and mTLS
 peer sync. It has its own backlog: see **`ROADMAP-0.16.0.md`**
 (FEAT-224 … FEAT-230). Notes on the earlier sketch:
 
 - **FEAT-220** (HTTPS + auth for `serve`, mDNS discovery) is
   **superseded** by **FEAT-229** — the HTTP-sharing surface is retired
-  in favour of mTLS secretd↔secretd sync.
+  in favour of mTLS secstored↔secstored sync.
 - **FEAT-219** (user templates) and **FEAT-221** (more source providers)
   remain valid and independent; they ride a later release.
 

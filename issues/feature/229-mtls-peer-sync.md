@@ -23,7 +23,7 @@ signing.
 
 ## Implementation
 
-1. `secretd` gains an **mTLS** listener (OpenSSL, already linked): each
+1. `secstored` gains an **mTLS** listener (OpenSSL, already linked): each
    node has an X.509 identity (cert + key); peers authenticate **both**
    ends.
 2. **TOFU cert pinning** (decision 2): on first contact a peer's cert is
@@ -45,7 +45,7 @@ implementation.
 
 ## Acceptance Criteria
 
-1. Two `secretd` instances replicate a store over mTLS; a store set on
+1. Two `secstored` instances replicate a store over mTLS; a store set on
    one appears on the other.
 2. A peer presenting an unpinned/changed cert is refused; a pinned peer
    succeeds.

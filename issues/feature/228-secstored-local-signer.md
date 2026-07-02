@@ -6,7 +6,7 @@ status: open
 milestone: 0.17.0
 ---
 
-# `secretd`: local signer daemon over an authenticated Unix socket
+# `secstored`: local signer daemon over an authenticated Unix socket
 
 ## Description
 
@@ -22,7 +22,7 @@ only** — never a TCP port, never remote.
 
 ## Implementation
 
-1. `secretd` serves an RPC over a **Unix domain socket** (mode `0600`
+1. `secstored` serves an RPC over a **Unix domain socket** (mode `0600`
    in a per-uid runtime dir) mapping to the FEAT-224/225/227 signer
    core: `derive`, `nostr.get-pubkey`, `nostr.sign-event`,
    `nostr.encrypt/decrypt`, `nip98`, `bip322.login`.
@@ -30,11 +30,11 @@ only** — never a TCP port, never remote.
    whose uid ≠ the daemon's; (b) a per-client token presented in a
    handshake, so individual clients (e.g. the browser bridge) can be
    authorised and revoked independently of the CLI.
-3. `secret` CLI verbs transparently use `secretd` when its socket is
+3. `secret` CLI verbs transparently use `secstored` when its socket is
    present, else run inline (same code path via the embedded core).
-4. The RPC defined here **is** the `libsecretc`/`libsecretd` boundary
-   (FEAT-231): `secretd` (engine, `libsecretd`) serves it; clients link
-   the thin `libsecretc` to speak it. Specify the wire format (framing,
+4. The RPC defined here **is** the `libsecstore-client`/`libsecstore` boundary
+   (FEAT-231): `secstored` (engine, `libsecstore`) serves it; clients link
+   the thin `libsecstore-client` to speak it. Specify the wire format (framing,
    handshake/token, request/response encoding) as a documented contract
    both libraries implement.
 
@@ -56,4 +56,4 @@ only** — never a TCP port, never remote.
    results identical to the inline CLI path.
 3. Revoking a client's token blocks it without affecting others.
 4. The chosen approval + unlock models are implemented and documented.
-5. No TCP listener is ever opened by `secretd`.
+5. No TCP listener is ever opened by `secstored`.
